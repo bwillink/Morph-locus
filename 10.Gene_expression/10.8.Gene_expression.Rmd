@@ -1,0 +1,337 @@
+---
+title: "Morph locus expression"
+author: "Beatriz Willink"
+date: "9/6/2022"
+output: html_document
+---
+Load packages
+```{r, message=FALSE}
+x <-
+  c(
+    "limma",  "edgeR", "ggplot2", "viridis",  "RSkittleBrewer", "genefilter", "dplyr", "facetscales", "gridExtra", "webshot")
+
+lapply(x, function(y) {
+  # check if installed, if not install
+  if (!y %in% installed.packages()[, "Package"])
+    install.packages(y)
+  
+  # load package
+  try(require(y, character.only = T), silent = T)
+})
+```
+
+# Ischnura elegans data
+
+Create count table
+```{r}
+pheno_data <- read.csv("~/Dropbox/VR/DGE/Iele_phenodata.csv")
+
+y <- read.table("~/Dropbox/VR/DGE/Afem_counts/transcript_count_matrix.csv", header = T, sep = ",")[,-1]
+
+rownames(y) <- read.table("~/Dropbox/VR/DGE/Afem_counts/transcript_count_matrix.csv", header = T, sep = ",")[,1]
+```
+
+Convert to DGE object and include sample info
+```{r}
+#create DGElist-object for edgeR
+x <- DGEList(y) 
+dim(x) # 24 samples and 34067 transcripts
+
+Age <- pheno_data[,4]
+x$samples$Age <- Age
+
+group <- as.factor(pheno_data[,2])
+
+x$samples$group <- group
+
+#See sample info
+x$samples
+```
+
+Normalize expression across samples
+```{r}
+# Filter
+ #filter genes to keep those with expression higher than cpm=1 in at least three samples
+keep <- rowSums(cpm(x)>1) >= 3
+x <- x[keep,]
+
+dim(x)
+
+# Normalise gene expression distributions
+x <- calcNormFactors(x, method = "TMM")
+
+lcpm <- cpm(x, log=TRUE)
+boxplot(lcpm, col = viridis(24), las=2, main="")
+```
+
+Create design matrix and estimate dispersion
+```{r}
+design.mat <- model.matrix(~ 0 + x$samples$group)
+
+colnames(design.mat) <- levels(x$samples$group)
+
+x2 <- estimateGLMCommonDisp(x,design.mat)
+x2 <- estimateGLMTrendedDisp(x2,design.mat, method="auto")
+
+x2 <- estimateGLMTagwiseDisp(x2,design.mat)
+
+plotBCV(x2)
+```
+DGE analysis and contrasts
+```{r}
+fit <- glmFit(x2, design.mat)
+
+lrt13 <- glmLRT(fit, contrast=c(1,0,-1,0,0,0,0,0)) # A vs I (immature)
+lrt15 <- glmLRT(fit, contrast=c(1,0,0,0,-1,0,0,0)) # A vs M (immature)
+lrt17 <- glmLRT(fit, contrast=c(1,0,0,0,0,0,-1,0)) # A vs O (immature)
+lrt35 <- glmLRT(fit, contrast=c(0,0,1,0,-1,0,0,0)) # I vs M (immature)
+lrt37 <- glmLRT(fit, contrast=c(0,0,1,0,0,0,-1,0)) # I vs O (immature)
+lrt75 <- glmLRT(fit, contrast=c(0,0,0,0,-1,0,1,0)) # O vs M (immature)
+
+lrt24 <- glmLRT(fit, contrast=c(0,1,0,-1,0,0,0,0)) # A vs I (mature)
+lrt26 <- glmLRT(fit, contrast=c(0,1,0,0,0,-1,0,0)) # A vs M (mature)
+lrt28 <- glmLRT(fit, contrast=c(0,1,0,0,0,0,0,-1)) # A vs O (mature)
+lrt46 <- glmLRT(fit, contrast=c(0,0,0,1,0,-1,0,0)) # I vs M (mature)
+lrt48 <- glmLRT(fit, contrast=c(0,0,0,1,0,0,0,-1)) # I vs O (mature)
+lrt86 <- glmLRT(fit, contrast=c(0,0,0,0,0,-1,0,1)) # O vs M (mature)
+```
+
+Check genes of interest
+```{r}
+genes <- c("Afem.4093.5", "Afem.4094.7", "Afem.4094.17", "Afem.4099.1", "Afem.4100.1", "Afem.4103.1",  "Afem.4111.2")
+
+exp_res <- rbind(lrt17$table[genes,], lrt13$table[genes,], lrt37$table[genes,], lrt15$table[genes,], lrt35$table[genes,], lrt75$table[genes,], lrt28$table[genes,], lrt24$table[genes,], lrt48$table[genes,], lrt26$table[genes,], lrt46$table[genes,], lrt86$table[genes,])
+
+exp_res$Contrast <- rep(rep(c("A vs O", "A vs I", "I vs O", "A vs male", "I vs male", "O vs male"), each = 7),2)
+
+exp_res$Stage <- rep(c("immature", "mature"), each = 42)
+
+exp_res$Transcript <- rep(rownames(lrt13$table[genes,]),12)
+
+rownames(exp_res) <- NULL
+
+exp_res <- exp_res[order(exp_res$Transcript), c(7,6,5,1,4)]
+exp_res$logFC <- round(exp_res$logFC,3)
+exp_res$PValue <- round(exp_res$PValue, 3)
+
+#write.table(exp_res, "~/Dropbox/VR/DGE/DGE_results_Aref.tsv", quote = F, row.names = F, sep = "\t")
+```
+
+Plot
+```{r}
+Expdf <- as.data.frame(lcpm[rownames(lcpm) %in% genes,])
+Expdf$Transcript <- rownames(Expdf)
+rownames(Expdf) <- c()
+ 
+Expdf <- pivot_longer(Expdf, cols = c(1:24), values_to = "Expression", names_to = "ID") 
+
+pheno_data$ID <- gsub("-", ".", pheno_data$ID)
+Expdf <- left_join(Expdf, pheno_data)
+
+Expdf$Group2 <- factor(Expdf$Group2, levels = c("A", "I", "O", "M"), ordered = T)
+
+pal <- wes_palette("Zissou1") 
+  p <- ggplot(data = Expdf, aes(Age,Expression)) + 
+    geom_point(aes(colour = Group2), size = 1.5 ,show.legend = T, position = position_dodge(width = .5), alpha = .7) +
+    theme_bw(base_size = 11) +
+   facet_wrap(~Transcript, nrow = 2, scales = "free_y") +
+    theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0), 
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(values = c(pal[c(1,3,5)], "black"),
+                     breaks = c(  "A", "I", "O", "M"),
+                     labels = c( "A", "I", "O", "Male"),
+                      name = "Morph and sex") +
+  scale_x_discrete(labels = c ("immature", "mature")) +
+    labs (x = "Age", y = "Expression (normalized log counts per million)")
+ p
+```
+# Ischnura senegalensis data
+
+Read transcript count data
+```{r}
+pheno_data_sen <- read.csv("~/Dropbox/VR/DGE/Isen_phenodata.csv")
+
+z <- read.table("~/Dropbox/VR/DGE/Afem_counts_Isen/transcript_count_matrix.csv", header = T, sep = ",")[,-1]
+
+rownames(z) <- read.table("~/Dropbox/VR/DGE/Afem_counts_Isen/transcript_count_matrix.csv", header = T, sep = ",")[,1]
+```
+
+Convert to DGE object and include sample info
+```{r}
+#create DGElist-object for edgeR
+w <- DGEList(z) 
+dim(w) # 31 samples and 53086 transcripts
+
+Age <- pheno_data_sen[,4]
+w$samples$Age <- Age
+
+Group <- pheno_data_sen[,3]
+w$samples$Group <- Group
+
+Tissue <- pheno_data_sen[,6]
+w$samples$Tissue <- Tissue
+
+#See sample info
+w$samples
+```
+
+Normalize expresssion across samples
+```{r}
+# Normalise gene expression distributions
+w <- calcNormFactors(w, method = "TMM")
+
+lcpm_sen <- cpm(w, log=TRUE)
+boxplot(lcpm_sen, col = viridis(30), las=2, main="")
+```
+Plot gene expression tenerals
+```{r}
+genes <- c("Afem.4093.5", "Afem.4094.7", "Afem.4094.17", "Afem.4099.1", "Afem.4100.1", "Afem.4103.1", "Afem.4111.1", "Afem.4111.2", "Isen.3751.2")
+
+Expdf_sen <- as.data.frame(lcpm_sen[rownames(lcpm_sen) %in% genes,])
+Expdf_sen$Transcript <- rownames(Expdf_sen)
+rownames(Expdf_sen) <- c()
+ 
+Expdf_sen <- pivot_longer(Expdf_sen, cols = c(1:24), values_to = "Expression", names_to = "ID") 
+Expdf_sen <- left_join(Expdf_sen, pheno_data_sen)
+
+Expdf_sen$Age <- factor(Expdf_sen$Age, levels = c("immature", "mature"), ordered = T)
+Expdf_sen$Group2 <- factor(Expdf_sen$Group2, levels = c("A", "O", "M"), ordered = T)
+
+pal <- wes_palette("Zissou1") 
+  p_sen_ten <- ggplot(data = Expdf_sen[Expdf_sen$Age == "immature",], aes(Tissue,Expression)) + 
+    geom_point(aes(colour = Group2), size = 1.5 ,show.legend = T, position = position_dodge(width = .5), alpha = 0.7) +
+    theme_bw(base_size = 11) +
+   facet_wrap(~Transcript, nrow = 2, scales = "free_y") +
+    theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0), 
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(values = c(pal[c(1,5)], "black"),
+                     breaks = c( "A", "O", "M"),
+                     labels = c("A",  "O", "Male"),
+                      name = "Morph and sex") +
+  #scale_shape_manual(values = c("circle", "square"), name = "Age") +
+  #scale_x_discrete(breaks = c( "immature", "mature"),
+  #                 labels = c ( "Immature", "Mature")) +
+    labs (x = "Tissue", y = "Expression (normalized log counts per million)")
+ p_sen_ten
+ 
+```
+
+Plot gene expression two-day old adults
+```{r}
+p_sen_imm <- ggplot(data = Expdf_sen[Expdf_sen$Age == "mature",], aes(Tissue,Expression)) + 
+    geom_point(aes(colour = Group2), size = 1.5 ,shape = "square", show.legend = T, position = position_dodge(width = .5), alpha = 0.7) +
+    theme_bw(base_size = 11) +
+   facet_wrap(~Transcript, nrow = 2, scales = "free_y") +
+    theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0), 
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(values = c(pal[c(1,5)], "black"),
+                     breaks = c( "A", "O", "M"),
+                     labels = c("A",  "O", "Male"),
+                      name = "Morph and sex") +
+  #scale_x_discrete(breaks = c( "immature", "mature"),
+  #                 labels = c ( "Immature", "Mature")) +
+    labs (x = "Tissue", y = "Expression (normalized log counts per million)")
+ 
+ p_sen <- grid.arrange( p_sen_ten, p_sen_imm, ncol = 1)
+```
+
+# DToL reference
+Create count table
+```{r}
+pheno_data <- read.csv("~/Dropbox/VR/DGE/Iele_phenodata.csv")
+
+y <- read.table("~/Dropbox/VR/DGE/DToL_counts/transcript_count_matrix.csv", header = T, sep = ",")[,-1]
+
+rownames(y) <- read.table("~/Dropbox/VR/DGE/DToL_counts/transcript_count_matrix.csv", header = T, sep = ",")[,1]
+```
+
+Convert to DGE object and include sample info
+```{r}
+#create DGElist-object for edgeR
+x <- DGEList(y) 
+dim(x) # 24 samples and 34067 transcripts
+
+Age <- pheno_data[,4]
+x$samples$Age <- Age
+
+group <- as.factor(pheno_data[,2])
+x$samples$group <- group
+
+#See sample info
+x$samples
+```
+
+Normalize expression across samples
+```{r}
+# Filter
+ #filter genes to keep those with expression higher than cpm=1 in at least three samples
+keep <- rowSums(cpm(x)>1) >= 3
+x <- x[keep,]
+
+dim(x)
+
+# Normalise gene expression distributions
+x <- calcNormFactors(x, method = "TMM")
+x$samples
+
+lcpm <- cpm(x, log=TRUE,normalized.lib.sizes = T)
+boxplot(lcpm, col = viridis(24), las=2, main="")
+```
+
+Create design matrix and estimate dispersion
+```{r}
+design.mat <- model.matrix(~ 0 + x$samples$group)
+
+colnames(design.mat) <- levels(x$samples$group)
+
+x2 <- estimateGLMCommonDisp(x,design.mat)
+x2 <- estimateGLMTrendedDisp(x2,design.mat, method="auto")
+
+x2 <- estimateGLMTagwiseDisp(x2,design.mat)
+plotBCV(x2)
+```
+DGE analysis and contrasts
+```{r}
+fit <- glmFit(x2, design.mat)
+
+lrt13 <- glmLRT(fit, contrast=c(1,0,-1,0,0,0,0,0)) # A vs I (immature)
+lrt15 <- glmLRT(fit, contrast=c(1,0,0,0,-1,0,0,0)) # A vs M (immature)
+lrt17 <- glmLRT(fit, contrast=c(1,0,0,0,0,0,-1,0)) # A vs O (immature)
+lrt35 <- glmLRT(fit, contrast=c(0,0,1,0,-1,0,0,0)) # I vs M (immature)
+lrt37 <- glmLRT(fit, contrast=c(0,0,1,0,0,0,-1,0)) # I vs O (immature)
+lrt75 <- glmLRT(fit, contrast=c(0,0,0,0,-1,0,1,0)) # M vs O (immature)
+
+lrt24 <- glmLRT(fit, contrast=c(0,1,0,-1,0,0,0,0)) # A vs I (mature)
+lrt26 <- glmLRT(fit, contrast=c(0,1,0,0,0,-1,0,0)) # A vs M (mature)
+lrt28 <- glmLRT(fit, contrast=c(0,1,0,0,0,0,0,-1)) # A vs O (mature)
+lrt46 <- glmLRT(fit, contrast=c(0,0,0,1,0,-1,0,0)) # I vs M (mature)
+lrt48 <- glmLRT(fit, contrast=c(0,0,0,1,0,0,0,-1)) # I vs O (mature)
+lrt86 <- glmLRT(fit, contrast=c(0,0,0,0,0,-1,0,1)) # M vs O (mature)
+```
+
+Export results
+```{r}
+genes <- c("MSTRG.3388.1", "MSTRG.3389.1", "MSTRG.3400.1")
+
+exp_res <- rbind(lrt17$table[genes,], lrt13$table[genes,], lrt37$table[genes,], lrt15$table[genes,], lrt35$table[genes,], lrt75$table[genes,], lrt28$table[genes,], lrt24$table[genes,], lrt48$table[genes,], lrt26$table[genes,], lrt46$table[genes,], lrt86$table[genes,])
+
+exp_res$Contrast <- rep(rep(c("A vs O", "A vs I", "I vs O", "A vs male", "I vs male", "O vs male"), each = 3),2)
+
+exp_res$Stage <- rep(c("immature", "mature"), each = 18)
+
+exp_res$Transcript <- rep(rownames(lrt15$table[genes,]),3)
+
+rownames(exp_res) <- NULL
+
+exp_res <- exp_res[order(exp_res$Transcript), c(7,6,5,1,4)]
+exp_res$logFC <- round(exp_res$logFC,3)
+exp_res$PValue <- round(exp_res$PValue, 3)
+
+#write.table(exp_res, "~/Dropbox/VR/DGE/DGE_results_ToLref.tsv", quote = F, row.names = F, sep = "\t")
+```

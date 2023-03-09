@@ -1,0 +1,3886 @@
+---
+title: "Final Morph locus figures"
+author: "Beatriz Willink"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: united
+    highlight: tango
+    number_sections: false
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+# Introduction
+
+This document provides scripts for all figures included in the manuscript entitled "*The genomics and evolution of inter-sexual mimicry and female-limited polymorphisms in damselflies*" by Willink et al. (2023). Figures are plotted in the order they appear in the manuscript. Panels are plotted separately in some cases and arranged as a multipanel figures in others. Multipanel assembly, insertion of photos and illustrations and minor aesthetic changes were made in [Inkscape](https://inkscape.org/) v. 0.91. Samplot figures were exported as .svg and edited in [Inkscape](https://inkscape.org/), to change colour schemes and fonts for final presentation.
+
+Load required packages.
+```{r load-packages, message=FALSE, results='hide', echo=TRUE, warning=FALSE}
+x <-
+  c("ggplot2", 
+    "kableExtra",
+    "wesanderson",
+    "tidyverse",
+    "RIdeogram",
+    "scales",
+    "dplyr",
+    "gridExtra",
+    "ggmsa",
+    "ggtree",
+    "ape",
+    "phytools",
+    "edgeR",
+    "GenotypePlot",
+    "vcfR", 
+    "viridis", 
+    "facetscales",
+    "Gviz",
+    "seqmagick"
+  )
+
+lapply(x, function(y) {
+  # check if installed, if not install
+  if (!y %in% installed.packages()[, "Package"])
+    install.packages(y)
+  
+  # load package
+  try(require(y, character.only = T), silent = T)
+})
+```
+
+# Figure 1
+
+Figure 1 is a schematic phylogeny based on Blow et al. 2021. It expands the clade that includes both *I. elegans* and *I. senegalensis* and collapses other clades as gray triangles.
+
+## Schematic phylogeny
+```{r phylo, message=FALSE, echo=TRUE, warning=FALSE}
+# read in the tree
+Isch <-
+  read.nexus(file = "~/Dropbox/MPE_Paper/MCMCglmm/2020/summary.tree")
+
+# nodes to collapse
+out1 <- findMRCA(Isch, c("Ischnura_pamelae", "Pacificagrion_sp."))
+out2 <- findMRCA(Isch, c("Ischnura_pumilio", "Ischnura_damula"))
+
+# node to label with origin of A
+out3 <- findMRCA(Isch, c("Ischnura_elegans", "Ischnura_capreolus"))
+
+pal <- wes_palette("Zissou1")
+
+# plot with rotated nodes
+p <-
+  ggtree(Isch) %>% ggtree::rotate(node = findMRCA(Isch, c("Ischnura_damula", "Ischnura_elegans"))) %>%
+  ggtree::rotate(node = findMRCA(Isch, c(
+    "Ischnura_capreolus", "Ischnura_elegans"
+  ))) %>%
+  ggtree::rotate(node = findMRCA(Isch, c(
+    "Ischnura_senegalensis", "Ischnura_elegans"
+  ))) %>%
+  ggtree::rotate(node = findMRCA(Isch, c(
+    "Ischnura_fluviatilis", "Ischnura_elegans"
+  ))) %>%
+  ggtree::rotate(node = findMRCA(Isch, c(
+    "Ischnura_evansi", "Ischnura_senegalensis"
+  ))) %>%
+  ggtree::rotate(node = findMRCA(Isch, c("Ischnura_pumilio", "Ischnura_damula")))
+
+# collapse and annotate
+p1 <-
+  scaleClade(p, out2, .2) %>% scaleClade(out1, .2) %>% ggtree::collapse(out1, fill =
+                                                                          'grey', 'min', alpha = .3) %>% ggtree::collapse(out2, fill = 'grey', 'min', alpha =
+                                                                                                                            .3) +
+  geom_point2(
+    aes(subset = (
+      node %in% c(5, 6, 13, 15, 17, 18, 19, 21, 23, 32, 33, 35, 34, 41)
+    )),
+    shape = 21,
+    size = 5,
+    fill = pal[5],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 0.6)
+  ) +
+  geom_point2(
+    aes(subset = (
+      node %in% c(5, 6, 13, 15, 17, 18, 19, 21, 23, 32, 33, 35, 34, 41)
+    )),
+    shape = 21,
+    size = 5,
+    fill = pal[1],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 1.8)
+  ) +
+  geom_point2(
+    aes(subset = (node %in% c(13, 21, 34))),
+    shape = 21,
+    size = 5,
+    fill = pal[4],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 3)
+  ) +
+  geom_point2(
+    aes(subset = (node %in% c(42))),
+    shape = 21,
+    size = 5,
+    fill = pal[5],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 0.6)
+  ) +
+  geom_point2(
+    aes(subset = (node %in% c(out3))),
+    shape = 21,
+    size = 5,
+    fill = pal[5],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 0.6)
+  ) +
+  geom_point2(
+    aes(subset = (node %in% c(out3))),
+    shape = 21,
+    size = 5,
+    fill = pal[1],
+    colour = "white",
+    alpha = 0.6,
+    position = position_nudge(x = 1.2)
+  )
+
+p1
+```
+
+
+# Figure 2
+
+Figure 2 summarizes GWAS and population genetics analyses in five panels.
+
+## Fig. 2a: full GWAS results
+
+### A vs O
+```{r GWAS_AvO, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered GWAS output
+A1354_AvO <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_AvO.assoc_filtered.txt", header = F)[,c(1,3:9)]
+
+# rename columns
+colnames(A1354_AvO) <- c("CHR", "BP", "A1" ,"FA", "FU", "A2", "CHISQ","P")
+
+# order chromosomes by size
+A1354_AvO$CHR <- ordered(A1354_AvO$CHR, levels = c("SUPER_1_RagTag", "SUPER_2_RagTag", "SUPER_3_RagTag", "SUPER_4_RagTag", "SUPER_5_RagTag", "SUPER_6_RagTag", "SUPER_7_RagTag", "SUPER_8_RagTag", "SUPER_9_RagTag", "SUPER_10_RagTag", "SUPER_11_RagTag", "SUPER_12_RagTag", "SUPER_13_RagTag", "SUPER_13_unloc_1_RagTag", "SUPER_13_unloc_2_RagTag", "SUPER_13_unloc_3_RagTag", "SUPER_13_unloc_4_RagTag", "SUPER_X_RagTag"))
+
+AvO <- A1354_AvO %>% 
+# compute chromosome size
+dplyr::group_by(CHR) %>% 
+  dplyr::summarise(chr_len=max(BP)) %>% 
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot=cumsum(chr_len)-chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(A1354_AvO, ., by=c("CHR"="CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum=BP+tot)
+
+# simplify chromosome names
+levels(AvO$CHR) <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "13", "13", "13", "13", "X")
+
+# change cumulative positions to chromosome scale
+AvO_p <- AvO %>%
+  dplyr::mutate(chr_num=as.numeric(CHR)) %>% 
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p=BP+tot+(chr_num - 1) * 10000000)
+  
+# make a data frame with the center position of each chromosome
+axisdf = AvO_p %>% dplyr::group_by(CHR) %>% dplyr::summarize(center = (max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p))) / 2)
+
+# plot
+AvO_A <- ggplot(AvO_p, aes(x=BPcum_p, y=-log10(P))) +
+  
+  # show all points
+  geom_point( aes(colour=as.factor(CHR)), alpha=0.5, size=0.5, stroke = 0.5) +
+  scale_color_manual(values = rep(c("grey5", "#006699"), 7 )) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks= axisdf$center ) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  ylim(2,12) +
+  # labels
+  labs(x = "Chromosome", title = "A vs O") +
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    # panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+AvO_A
+```
+
+### A vs I
+```{r GWAS_AvI, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered GWAS output
+A1354_AvI <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_AvI.assoc_filtered.txt", header = F)[,c(1,3:9)]
+
+# rename columns
+colnames(A1354_AvI) <- c("CHR", "BP", "A1" ,"FA", "FU", "A2", "CHISQ","P")
+
+# order chromosomes by size
+A1354_AvI$CHR <- ordered(A1354_AvI$CHR, levels = c("SUPER_1_RagTag", "SUPER_2_RagTag", "SUPER_3_RagTag", "SUPER_4_RagTag", "SUPER_5_RagTag", "SUPER_6_RagTag", "SUPER_7_RagTag", "SUPER_8_RagTag", "SUPER_9_RagTag", "SUPER_10_RagTag", "SUPER_11_RagTag", "SUPER_12_RagTag", "SUPER_13_RagTag", "SUPER_13_unloc_1_RagTag", "SUPER_13_unloc_2_RagTag", "SUPER_13_unloc_3_RagTag", "SUPER_13_unloc_4_RagTag", "SUPER_X_RagTag"))
+
+AvI <- A1354_AvI %>% 
+  # compute chromosome size
+  dplyr::group_by(CHR) %>% 
+  dplyr::summarise(chr_len=max(BP)) %>% 
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot=cumsum(chr_len)-chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(A1354_AvI, ., by=c("CHR"="CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate( BPcum=BP+tot)
+
+# simplify chromosome names
+levels(AvI$CHR) <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "13", "13", "13", "13", "X")
+
+# change cumulative positions to chromosome scale
+AvI_p <- AvI %>%
+  dplyr::mutate(chr_num=as.numeric(CHR)) %>% 
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p=BP+tot+(chr_num - 1) * 10000000)
+
+# make a data frame with the center position of each chromosome
+axisdf = AvI_p %>% dplyr::group_by(CHR) %>% dplyr::summarize(center = (max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p))) / 2)
+
+# plot
+AvI_A <- ggplot(AvI_p, aes(x=BPcum_p, y=-log10(P))) +
+  
+  # show all points
+  geom_point( aes(colour=as.factor(CHR)), alpha=0.5, size=0.5, stroke = 0.5) +
+  scale_color_manual(values = rep(c("grey50", "#006699"), 7 )) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks= axisdf$center ) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  # labels
+  labs(x = "Chromosome", title = "A vs I") +
+  ylim(2,12) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+AvI_A
+```
+
+### I vs O
+```{r GWAS_IvO, message=FALSE, echo=TRUE, warning=FALSE}
+
+# read filtered GWAS output
+A1354_IvO <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_IvO.assoc_filtered.txt", header = F)[,c(1,3:9)]
+
+# rename columns
+colnames(A1354_IvO) <- c("CHR", "BP", "A1" ,"FA", "FU", "A2", "CHISQ","P")
+
+# order chromosomes by size
+A1354_IvO$CHR <- ordered(A1354_IvO$CHR, levels = c("SUPER_1_RagTag", "SUPER_2_RagTag", "SUPER_3_RagTag", "SUPER_4_RagTag", "SUPER_5_RagTag", "SUPER_6_RagTag", "SUPER_7_RagTag", "SUPER_8_RagTag", "SUPER_9_RagTag", "SUPER_10_RagTag", "SUPER_11_RagTag", "SUPER_12_RagTag", "SUPER_13_RagTag", "SUPER_13_unloc_1_RagTag", "SUPER_13_unloc_2_RagTag", "SUPER_13_unloc_3_RagTag", "SUPER_13_unloc_4_RagTag", "SUPER_X_RagTag"))
+
+IvO <- A1354_IvO %>% 
+  # compute chromosome size
+  dplyr::group_by(CHR) %>% 
+  dplyr::summarise(chr_len=max(BP)) %>% 
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot=cumsum(chr_len)-chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(A1354_IvO, ., by=c("CHR"="CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate( BPcum=BP+tot)
+
+# simplify chromosome names
+levels(IvO$CHR) <- c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "13", "13", "13", "13", "X")
+
+# change cumulative positions to chromosome scale
+IvO_p <- IvO %>%
+  dplyr::mutate(chr_num=as.numeric(CHR)) %>% 
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p=BP+tot+(chr_num - 1) * 10000000)
+
+# make a data frame with the center position of each chromosome
+axisdf = IvO_p %>% group_by(CHR) %>% summarize(center=( max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p)) ) / 2 )
+
+# plot
+IvO_A <- ggplot(IvO_p, aes(x=BPcum_p, y=-log10(P))) +
+  
+  # show all points
+  geom_point( aes(colour=as.factor(CHR)), alpha=0.5, size=0.5, stroke = 0.5) +
+  scale_color_manual(values = rep(c("grey80", "#006699"), 7 )) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks= axisdf$center ) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  ylim(2,12) +
+  # labels
+  labs(x = "Chromosome", title = "I  vs O") +
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+IvO_A
+```
+
+## Fig. 2b: Zooming in the region of most significant SNPs
+```{r GWAS_zoom, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered data sets
+A1354_AvO <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_AvO.assoc_filtered.txt", header = F)[,c(1,3:9)]
+A1354_AvI <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_AvI.assoc_filtered.txt", header = F)[,c(1,3:9)]
+A1354_IvO <- read.table("~/Dropbox/VR/GWAS/A1354_ragtag_IvO.assoc_filtered.txt", header = F)[,c(1,3:9)]
+
+# select the unlocalized scaffold 2 of chromosome 13
+AvO_2 <- A1354_AvO %>% dplyr::filter(A1354_AvO$V1 == "SUPER_13_unloc_2_RagTag")
+AvI_2 <- A1354_AvI %>% dplyr::filter(A1354_AvI$V1 == "SUPER_13_unloc_2_RagTag")
+IvO_2 <- A1354_IvO %>% dplyr::filter(A1354_IvO$V1 == "SUPER_13_unloc_2_RagTag")
+
+# create column with comparisons
+AvO_2$comp <- "AvO"
+AvI_2$comp <- "AvI"
+IvO_2$comp <- "IvO"
+
+# make data frame with all comparisons
+unloc_2 <- rbind(AvO_2, AvI_2, IvO_2)
+colnames(unloc_2) <- c("CHR", "BP", "A1" ,"FA", "FU", "A2", "CHISQ","P", "COM")
+
+# order comparisons
+unloc_2$COM <- ordered(unloc_2$COM, levels = c("AvO", "AvI", "IvO"))
+
+# plot
+unloc_2_A <- ggplot(unloc_2, aes(x=BP / 1000000, y=-log10(P))) +
+  
+  # show all points
+  geom_point(aes(colour=as.factor(COM), fill=as.factor(COM)), pch =21, size=1, stroke = 0.5, alpha = 1) +
+  scale_color_manual(values = c("grey5","grey50", "grey90")) +
+  scale_fill_manual(values = c("grey5","grey50", "grey90")) +
+  #scale_alpha_manual(values = c(1,1,1)) +
+  # labels
+  labs(x = "Position on unlocalized scaffold 2 (Chr 13)") +
+  
+  xlim(0, 1.8) + 
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+unloc_2_A
+```
+
+Plot figures 2a-b and export
+```{r GWAS_all, message=FALSE, echo=TRUE, warning=FALSE}
+lay <- rbind(c(1),
+             c(2),
+             c(3),
+             c(4),
+             c(4))
+
+GWAS_all <- grid.arrange(AvO_A, AvI_A, IvO_A, unloc_2_A, layout_matrix = lay, ncol = 1 )
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/gwas_main.pdf", plot = GWAS_all, width = 180, height = 120, units = "mm")
+```
+
+## Fig. 2c: Fst
+
+```{r fst, message=FALSE, echo=TRUE, warning=FALSE}
+# read pixy output
+fst <- read.table("~/Dropbox/VR/pixy/Afem_pixy_30K_fst.txt", header = T)
+
+# negative values to 0
+fst$avg_hudson_fst[fst$avg_hudson_fst < 0] <- 0
+
+# what's the median and range of non 0 Fst values?
+median(fst$avg_hudson_fst[fst$avg_hudson_fst > 0], na.rm = T)
+quantile(fst$avg_hudson_fst[fst$avg_hudson_fst > 0], na.rm = T, probs = c(0.05,0.95))
+
+# make columns for window md point and comparisons
+fst$midpoint <- (fst$window_pos_1 + fst$window_pos_2) / 2
+fst$comp <- paste0(fst$pop1,"v",fst$pop2)
+
+# select the unlocalized scaffold 2 of chromosome 13
+fst_unloc2 <- fst[fst$chromosome == "SUPER_13_unloc_2_RagTag",]
+
+# drop NA windows
+fst_unloc2 <- fst_unloc2[complete.cases(fst_unloc2[ , 6]),]
+
+# plot
+fst_p <-
+  ggplot(data = fst_unloc2,
+         aes(
+           x = midpoint / 1000000,
+           y = avg_hudson_fst,
+           colour = comp,
+           lty = comp
+         )) +
+  geom_line(aes(colour = as.factor(comp)), size = 0.5,  alpha = 1) +
+  facet_wrap( ~ comp, nrow = 3) +
+  scale_color_manual(values = c("grey5", "grey50", "grey85")) +
+  scale_fill_manual(values = c("grey5", "grey5", "grey85")) +
+  scale_linetype_manual(values = c("solid", "solid", "solid")) +
+  #scale_alpha_manual(values = c(1,1,1)) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = "Fst") +
+  
+  xlim(0, 1.8) +
+  
+  geom_hline(
+    yintercept = 0.0444,
+    lty = 2,
+    colour = "gray80",
+    size = 0.5
+  ) +
+  # Custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+fst_p
+
+# export
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/fst.pdf", plot = fst_p, width = 180, height = 40, units = "mm")
+```
+
+## Fig. 2d: Tajima's D
+
+```{r Tajima, message=FALSE, echo=TRUE, warning=FALSE}
+# read VCF tools output
+Tajima <- read.table("~/Dropbox/VR/popgen/A1354_30kb.Tajima.D", header = T)
+#head(Tajima)
+
+# what's the range of genome wide values?
+quantile(Tajima$TajimaD, na.rm = T, probs = c(0.05,0.95))
+
+# calculate window size and midpoint
+w_size <- Tajima$BIN_START[Tajima$CHROM == "SUPER_1_RagTag"][2] -Tajima$BIN_START[Tajima$CHROM == "SUPER_1_RagTag"][1]
+Tajima$midpoint <- (Tajima$BIN_START + w_size/2)
+
+# select the unlocalized scaffold 2 of chromosome 13
+Taj_unloc2 <- Tajima[Tajima$CHROM == "SUPER_13_unloc_2_RagTag",]
+
+# drop NA windows
+Taj_unloc2 <- Taj_unloc2[complete.cases(Taj_unloc2[ , 4]),]
+
+# plot
+Taj_p <- ggplot(data = Taj_unloc2, aes(x = midpoint / 1000000, y = TajimaD)) +
+   geom_line(colour = pal[5], size=0.5,  alpha = 0.7) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = "Tajima's D") +
+  
+  xlim(0, 1.8) + 
+  
+  geom_ribbon(aes(ymin = -1.345, ymax = 0.447), lty = 0, fill = "gray5", alpha = 0.2) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+Taj_p
+```
+
+## Fig. 2e: Nucleotide diversity
+
+```{r pi, message=FALSE, echo=TRUE, warning=FALSE}
+# read pixy output
+Pi <- read.table("~/Dropbox/VR/pixy/pi/Afem_pi_30K_pi.txt", header = T)
+#head(Pi)
+
+# what's the range of genome-wide values?
+quantile(Pi$avg_pi, na.rm = T, probs = c(0.05,0.95))
+
+# compute midpoint
+Pi$midpoint <- (Pi$window_pos_2 + Pi$window_pos_1) /2
+
+# select the unlocalized scaffold 2 of chromosome 13
+Pi_unloc2 <- Pi[Pi$chromosome == "SUPER_13_unloc_2_RagTag",]
+
+# drop NA windows
+Pi_unloc2 <- Pi_unloc2[complete.cases(Pi_unloc2[ , 5]),]
+
+# plot
+Pi_p <- ggplot(data = Pi_unloc2, aes(x = midpoint / 1000000, y = avg_pi)) +
+   geom_line(colour = "grey5", size=0.5,  alpha = 0.7) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = expression (pi)) +
+  
+  xlim(0, 1.8) + 
+  ylim (0,0.04) +
+  
+  geom_ribbon(aes(ymin = 0.002251009, ymax = 0.026671362), lty = 0, fill = "gray5", alpha = 0.2) +
+  # Custom the theme:
+  theme_minimal(base_size = 6) +
+  theme( 
+    legend.position="none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+Pi_p
+```
+
+Plot Tajima's D and pi together and export
+```{r pogen, message=FALSE, echo=TRUE, warning=FALSE}
+popgen <- grid.arrange(Taj_p, Pi_p, ncol = 1)
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/popgen.pdf", plot = popgen, width = 180, height = 40, units = "mm")
+```
+
+# Figure 3
+
+Figure 3 shows the mapping location of significant *k*-mers in a *k*-mer based GWAS and read depth coverage across the relevant regions of the unlocalized scaffold 2 of chromosome 13.
+
+## Fig. 3a: *k*-mers mapped to A reference
+
+```{r kmers_A, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered blast output
+blast_AI <- read.table("~/Dropbox/VR/GWAS/AvI_kmers.fa_v_A1354_Shasta_run1_table.tsv", header = FALSE)[,c(2,9)]
+blast_AI$comp <- "AvI"
+
+blast_AO <- read.table("~/Dropbox/VR/GWAS/AvO_kmers.fa_v_A1354_Shasta_run1_table.tsv", header = FALSE)[,c(2,9)]
+blast_AO$comp <- "AvO"
+
+blast_IO <- read.table("~/Dropbox/VR/GWAS/OvAI_kmers.fa_v_A1354_Shasta_run1_table.tsv", header = FALSE)[,c(2,9)]
+blast_IO$comp <- "AIvO"
+
+# combine, rename and filter
+blast_out <- rbind(blast_AI, blast_AO, blast_IO)
+colnames(blast_out)[1:2] <- c("contig", "start")
+contig_1776 <- blast_out[which(blast_out$contig == "1776_1"),]
+contig_1776$comp <- factor(contig_1776$comp, levels = c("AvO", "AvI", "AIvO"), ordered = T)
+
+# what percentage of significant k-mers map to this contig?
+nrow(contig_1776)/nrow(blast_out)
+
+# plot
+pal <- wes_palette("Zissou1")
+kmer_denA <- ggplot(data = contig_1776, aes(x = (max(contig_1776$start) - start)/1000000, fill = comp, alpha = comp, colour = comp)) + 
+  geom_histogram(bins = 60, size = 0.3, position = "stack") +
+  theme_minimal(base_size = 7) + 
+  labs(x="Position on scaffold 2 (Chr 13)", y="31-mer count") +
+   xlim(0,1.55) +
+  ylim(0,40000) +
+  scale_fill_manual(values = c("grey5","grey50", "grey85"), 
+                    labels = c("A vs O", "A vs I", "A and I vs O"), 
+                    name = "Comparison") +
+   scale_colour_manual(values = c("grey10","grey10", "grey10"), 
+                    labels = c("A vs O", "A vs I", "A and I vs O"), 
+                    name = "Comparison") +
+  scale_alpha_manual(values = c(0.7, 0.7, 0.7),
+                     labels = c("A vs O", "A vs I", "A and I vs O"), 
+                    name = "Comparison") + 
+  theme(panel.grid.minor= element_blank(),
+        panel.grid.major= element_blank(),
+        legend.position = "top")
+kmer_denA 
+
+
+ggsave(filename = "~/Dropbox/VR/Writing/Figures/kmerGWAS_main.pdf", plot = kmer_denA, width = 108, height = 80, units = "mm")
+```
+
+## Fig. 3a: *k*-mers mapped to I reference
+
+```{r kmers_I, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered blast output
+blast_outI <- read.table("~/Dropbox/VR/GWAS/OvAI_kmers.fa_v_Ifem_1049_ragtag_table.tsv", header = FALSE)[,c(2,9)]
+colnames(blast_outI) <- c("contig", "start")
+
+# filter and add comparison column
+unloc_2 <- blast_outI[which(blast_outI$contig == "SUPER_13_unloc_2_RagTag"),]
+unloc_2$comp <- "AIvO"
+
+# what percentage of significant k-mers map to this
+nrow(unloc_2)/nrow(blast_outI)
+
+# plot
+kmer_denI <- ggplot(data = unloc_2, aes(x = start/1000000, fill = comp)) + 
+  geom_histogram(bins = 36, colour = "grey20", size = 0.5, position = "stack", alpha = 0.7) +
+  theme_minimal(base_size = 7) + 
+  labs(x=" ", y="31-mer count") +
+  scale_x_continuous(limits = c(3.496,3.78)) +
+  ylim(0,4500) +
+  scale_fill_manual(values = "grey85", 
+                    labels = "A and I vs O", 
+                    name = "Comparison") +
+   theme(panel.grid.minor= element_blank(),
+        panel.grid.major= element_blank(),
+        legend.position = "top") 
+
+kmer_denI 
+```
+
+Plot figs 3a and b together and export
+
+```{r kmers_all, message=FALSE, echo=TRUE, warning=FALSE}
+# 2:1 layout matrix
+lay <- rbind(c(1,1,2))
+
+Kmer_all <- grid.arrange(kmer_denA, kmer_denI, layout_matrix = lay, ncol = 2 )
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/kmerGWAS_all.pdf", plot = Kmer_all, width = 170, height = 80, units = "mm")
+```
+
+## Fig. 3c: Read-depth coverage on A
+
+```{r read_depth_A, message=FALSE, echo=TRUE, warning=FALSE}
+# read coverage data
+cov <- read.table("~/Dropbox/VR/GWAS/reseq_coverage_norepeat_500_window.bed", header = F)
+
+# read phenotype data
+popmap <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T )
+
+# name columns
+colnames(cov) <- c("contig", "start", "end", "coverage")
+
+cov <- cov[cov$contig == "1776_1" | cov$contig == "28_1",]
+
+# create useful variables
+cov$sample <- rep(popmap$ind, each = nrow(cov)/nrow(popmap))
+cov$morph <- rep(popmap$pop, each = nrow(cov) /nrow(popmap))
+cov$midpoint <- (cov$end + cov$start)/2
+
+# compute average coverage in representative contig
+S1 <- data.frame(sample =  popmap$ind)
+for (i in 1:nrow(S1)) {
+  S1$avg[i] <- mean(cov$coverage[which(cov$sample == S1$sample[i] &
+                                         cov$contig == "28_1")]) 
+}
+
+# compute standardized coverage
+n = nrow(cov)
+for (i in 1:n) {
+  cov$relcov[i] <- cov$coverage[i]/S1$avg[which(S1$sample == cov$sample[i])]
+  
+}
+
+# read long read data coverage
+ncov <- read.table("~/Dropbox/VR/GWAS/nano_coverage_norepeat_500_window.bed", header = F)
+colnames(ncov) <- c("contig", "start", "end", "coverage")
+
+# filter and make useful variables
+ncov <- ncov[ncov$end < 15000000,]
+ncov$morph <- rep(c("A", "I", "O"), each = nrow(ncov) / 3)
+ncov$midpoint <- (ncov$end + ncov$start)/2
+
+# compute average coverage in representative contig
+S2 <- data.frame(sample = c("A", "I", "O") )
+for (i in 1:nrow(S2)) {
+  S2$avg[i] <- mean(ncov$coverage[which(ncov$morph == S2$sample[i] &
+                                         ncov$contig == "28_1")]) 
+}
+
+# compute standardized coverage
+n = nrow(ncov)
+for (i in 1:n) {
+  ncov$relcov[i] <- ncov$coverage[i]/S2$avg[which(S2$sample == ncov$morph[i])]
+  
+}
+
+pal  <- wes_palette("Zissou1")[c(1,3,5)]
+c_plot <-
+  ggplot(data = cov[cov$contig == "1776_1",], aes(
+    x = (max(cov$midpoint[cov$contig == "1776_1"]) - midpoint) / 1000000,
+    y = relcov,
+    colour = morph,
+    lty = sample, 
+    fill = morph
+  )) +
+  geom_path(size = 0.2)+
+  geom_ribbon(aes(ymin = 0, ymax = relcov), alpha = 0.2) +
+  geom_path(data = ncov[ncov$contig == "1776_1",], size = 0.2, colour = "black", lty =5) +
+  #geom_point(size = 0.3) +
+  facet_wrap(~morph, nrow = 3) +
+  ylim (0,5) + 
+  #xlim(47000, 300000) +
+  theme_minimal(base_size = 9) +
+  labs(y = "Read depth relative to background", x =  "Window midpoint on unlocalized scaffold 2 (Chr 13)") +
+  theme(panel.grid = element_blank()) +
+  scale_colour_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  #scale_x_continuous(n.breaks = 4, limits = c(0,1.5) ) +
+  #scale_linetype_manual(values=line_types, guide = F) +
+  scale_linetype_manual(values = rep("solid",57), guide = "none") 
+  
+c_plot
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/read_depth_A.pdf", plot = c_plot, width = 120, height = 80, units = "mm")
+```
+
+## Fig. 3d: Read-depth coverage on I
+
+```{r read_depth_I, message=FALSE, echo=TRUE, warning=FALSE}
+# read coverage data
+cov <- read.table("~/Dropbox/VR/ISCH_genome/Ifem_1049/coverage/reseq_coverage_norepeat_500_window_15Mb.bed", header = F)
+
+# read phenotype data
+popmap <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T )
+
+# rename columns
+colnames(cov) <- c("contig", "start", "end", "coverage")
+
+# create useful variables
+cov$sample <- rep(popmap$ind, each = nrow(cov)/nrow(popmap))
+cov$morph <- rep(popmap$pop, each = nrow(cov) /nrow(popmap))
+cov$midpoint <- (cov$end + cov$start)/2
+
+# compute average coverage in representative contig
+S1 <- data.frame(sample =  popmap$ind)
+for (i in 1:nrow(S1)) {
+  S1$avg[i] <- mean(cov$coverage[which(cov$sample == S1$sample[i] &
+                                         cov$contig == "SUPER_1_RagTag")]) 
+}
+
+# compute standardized coverage 
+n = nrow(cov)
+for (i in 1:n) {
+  cov$relcov[i] <- cov$coverage[i]/S1$avg[which(S1$sample == cov$sample[i])]
+  
+}
+# read long read coverage data
+ncov <- read.table("~/Dropbox/VR/ISCH_genome/Ifem_1049/coverage/Ifem_nano_coverage_norepeat_500_window.bed", header = F)
+
+# rename columns
+colnames(ncov) <- c("contig", "start", "end", "coverage")
+
+# filter and create useful variables
+ncov <- ncov[ncov$end < 15000000,]
+ncov$morph <- rep(c("A", "I", "O"), each = nrow(ncov) / 3)
+ncov$midpoint <- (ncov$end + ncov$start)/2
+
+# compute average coverage in representative contig
+S2 <- data.frame(sample = c("A", "I", "O") )
+for (i in 1:nrow(S2)) {
+  S2$avg[i] <- mean(ncov$coverage[which(ncov$morph == S2$sample[i] &
+                                         ncov$contig == "SUPER_1_RagTag")]) 
+}
+
+# compute standardized coverage
+n = nrow(ncov)
+for (i in 1:n) {
+  ncov$relcov[i] <- ncov$coverage[i]/S2$avg[which(S2$sample == ncov$morph[i])]
+  
+}
+
+# plot
+pal  <- wes_palette("Zissou1")[c(1,3,5)]
+c_plot <-
+  ggplot(data = cov[cov$contig == "SUPER_13_unloc_2_RagTag",], aes(
+    x =  midpoint / 1000000,
+    y = relcov,
+    colour = morph,
+    lty = sample, 
+    fill = morph
+  )) +
+  geom_path(size = 0.2)+
+  geom_ribbon(aes(ymin = 0, ymax = relcov), alpha = 0.2) +
+  geom_path(data = ncov[which(ncov$contig == "SUPER_13_unloc_2_RagTag"),], size = 0.2, colour = "black", lty =5) +
+  #geom_point(size = 0.3) +
+  facet_wrap(~morph, nrow = 3) +
+  ylim (0,5) + 
+  theme_minimal(base_size = 7) +
+  labs(y = "Read depth relative to background", x =  "Window midpoint on scaffold 2 (Chr 13)") +
+  theme(panel.grid = element_blank(),
+        legend.position = "none") +
+  scale_colour_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  scale_x_continuous(n.breaks = 6, limits = c(3.496,3.78) ) +
+  #scale_linetype_manual(values=line_types, guide = F) +
+  scale_linetype_manual(values = rep("solid",57), guide = "none")
+
+c_plot
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/read_depth_I.pdf", plot = c_plot, width = 60, height = 60, units = "mm")
+```
+
+# Figure 4
+
+This figure shows the alignment between genome assemblies and a schematic representation of the hypothesized structural changes assocatied with morph divergence.
+
+## Fig. 4a: Assembly alignments
+I plot each alignment here and arranged them into one figure using Inkscape. 
+
+### A haplotype vs O haplotype (SUPER_13_unloc2)
+
+```{r aln_AvO, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <- c('Start_2','End_2','Start_1','End_1','L1','L2','Percent','lenR','lenQ','Species_2','Species_1')
+AO <- readr::read_csv(file = "~/Dropbox/VR/SV/nucmer_aln_Ofem_0081_ragtag_Afem_1354_ragtag.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames )
+
+# filter columns
+AO <- AO[,-c(6:9)]
+AO <- AO[,c('Species_1', 'Start_1', 'End_1', 'Species_2', 'Start_2', 'End_2', 'L1')]
+
+AO <- AO %>% filter(Species_1 == "SUPER_13_unloc_2_RagTag")
+AO <- AO %>% filter(Species_2 == "SUPER_13_unloc_2_RagTag")
+
+AO <- AO %>% filter(L1 > 5000)
+
+# add fill colour
+AO$fill <- "CCCCCC"
+
+# select alignment region and write file
+AO_main <- AO %>% filter(End_1 < 3500000) %>% filter(End_2 < 5500000)
+#write.csv(AO_main, "~/Dropbox/VR/SV/synteny_AO_unloc2.csv", row.names = F, quote = F)
+syn <- read.csv("~/Dropbox/VR/SV/synteny_AO_unloc2.csv", header = T, sep = ",")[,-7]
+
+# rename species as numbers
+syn$Species_1 <-as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_1))
+syn$Species_2 <-as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_2))
+
+# mark shared internal region in black
+for (i in 1:nrow(syn)) {
+  if (syn$Start_2[i] > 600000 & syn$Start_2[i] < 1000000) {
+    syn$fill[i] <- "000000"
+  }
+}
+
+# order by colour
+syn <- syn[rev(order(syn$fill)),]
+
+# read karyotype info
+kar <- read.csv("~/Dropbox/VR/SV/karyotype_AO_RagTag.csv", header = T, sep = ",")
+
+# save plot
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Writing/Figures/AO.svg")
+```
+
+### A haplotype vs I haplotype (SUPER_13_unloc2)
+
+```{r aln_AvI, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <- c('Start_1','End_1','Start_2','End_2','L2','L1','Percent','lenR','lenQ','Species_1','Species_2')
+AI <- readr::read_csv(file = "~/Dropbox/VR/SV/nucmer_aln_Ifem_1049_ragtag_Afem_1354_ragtag.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames )
+
+# filter columns
+AI <- AI[,-c(6:9)]
+AI <- AI[,c('Species_1', 'Start_1', 'End_1', 'Species_2', 'Start_2', 'End_2', 'L2')]
+
+AI <- AI %>% filter(Species_1 == "SUPER_13_unloc_2_RagTag")
+AI <- AI %>% filter(Species_2 == "SUPER_13_unloc_2_RagTag")
+
+AI <- AI %>% filter(L2 > 5000)
+
+# Add fill colour
+AI$fill <- "CCCCCC"
+
+# select alignment region
+AI_main <- AI %>% filter(End_1 < 5500000) %>% filter(End_2 < 3750000) %>% filter (Start_2 > 312420)
+
+# A assembly starts downstream ~ 300 kb of I assembly
+AI_main$Start_2 <- AI_main$Start_2 - 312420
+AI_main$End_2 <- AI_main$End_2 - 312420
+
+# write final alignment file
+#write.csv(AI_main, "~/Dropbox/VR/SV/synteny_AI_unloc2.csv", row.names = F, quote = F)
+syn <- read.csv("~/Dropbox/VR/SV/synteny_AI_unloc2.csv", header = T, sep = ",")[,-7]
+
+# rename species as numbers
+syn$Species_1 <-as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_1))
+syn$Species_2 <-as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_2))
+
+# mark shared internal region in black
+for (i in 1:nrow(syn)) {
+  if (syn$Start_1[i] > 600000 & syn$Start_1[i] < 1000000) {
+    syn$fill[i] <- "000000"
+  }
+}
+
+# order by colour
+syn <- syn[rev(order(syn$fill)),]
+
+# read karyotype info
+kar <- read.csv("~/Dropbox/VR/SV/karyotype_AI_RagTag.csv", header = T, sep = ",")
+
+# save plot
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Writing/Figures/AI.svg")
+```
+
+## Fig. 4d: SV hypotheses
+
+I made this schematic figure using Inkscape.
+
+# Figure 5
+
+This figure provides the main evidence for a shared genetic basis of the *A* haplotype in *I. elegans* and *I. senegalensis*. Fig. 5a is composed of three photographs. Fig. 5b shows read-depth coverage of pool-seq data of *I. senegalensis* on the *A* haplotype of *I. elegans*. Fig. 5c shows alignments between the *A* haplotype of *I. elegans* and the *A* and *O*-like assemblies of *I. senegalensis*.
+
+## Fig. 5b: Read depth coverage
+
+```{r sen_read_depth, message=FALSE, echo=TRUE, warning=FALSE}
+# read coverage data
+scov <-
+  read.table("~/Dropbox/VR/I_sen/poolseq_coverage_norepeat_500_window.bed",
+             header = F)
+
+# rename columns
+colnames(scov) <- c("contig", "start", "end", "coverage")
+
+# flip coords to match direction of DToL assembly
+scov$start <- 1541068 - scov$start
+scov$end <- 1541068 - scov$end
+
+# make useful variables
+scov$sample <- rep(c("A", "O"), each = nrow(scov) / 2)
+scov$morph <- scov$sample
+scov$midpoint <- (scov$end + scov$start) / 2
+
+# compute average coverage in representative contig
+S1 <- data.frame(sample =  c("A", "O"))
+for (i in 1:nrow(S1)) {
+  S1$avg[i] <- mean(scov$coverage[which(scov$sample == S1$sample[i] &
+                                          scov$contig == "28_1")])
+}
+
+# compute standardized coverage
+n = nrow(scov)
+for (i in 1:n) {
+  scov$relcov[i] <-
+    scov$coverage[i] / S1$avg[which(S1$sample == scov$sample[i])]
+  
+}
+
+# plot
+pal  <- wes_palette("Zissou1")[c(1, 5)]
+sc_plot <-
+  ggplot(data = scov[scov$contig == "1776_1", ],
+         aes(
+           x = midpoint / 1000000,
+           y = relcov,
+           colour = morph,
+           lty = sample,
+           fill = morph
+         )) +
+  geom_path(size = 0.1) +
+  geom_ribbon(aes(ymin = 0, ymax = relcov), alpha = 0.2) +
+  facet_wrap( ~ morph, nrow = 2) +
+  ylim (0, 4) +
+  theme_minimal(base_size = 7) +
+  labs(y = "Read depth relative to background", x =  "Window midpoint on scaffold 2 (Chr 13)") +
+  theme(panel.grid = element_blank()) +
+  scale_colour_manual(values = pal,
+                      labels = c("A", "O-like"),
+                      name = "Morph") +
+  scale_fill_manual(values = pal,
+                    labels = c("A", "O-like"),
+                    name = "Morph") +
+  scale_linetype_manual(values = rep("solid", 2), guide = "none")
+
+sc_plot
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/read_depth_Isen.pdf", plot = sc_plot, width = 90, height = 60, units = "mm")
+```
+
+## Fig. 5b: assembly alignmnet
+
+*A* vs *O*-like assembly
+```{r aln_AvO-like, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <-
+  c(
+    'Start_2',
+    'End_2',
+    'Start_1',
+    'End_1',
+    'L1',
+    'L2',
+    'Percent',
+    'lenR',
+    'lenQ',
+    'Species_2',
+    'Species_1'
+  )
+AO <-
+  readr::read_csv(file = "~/Dropbox/VR/Isen_assembly/nucmer_aln_Ofem_Isen_Afem_Iele.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames)
+
+# filter columns
+AO <- AO[, -c(6:9)]
+AO <-
+  AO[, c('Species_1',
+         'Start_1',
+         'End_1',
+         'Species_2',
+         'Start_2',
+         'End_2',
+         'L1')]
+
+AO <-
+  AO %>% filter(
+    Species_1 == "962_1" |
+      Species_1 == "1486_1" |
+      Species_1 == "546_1" |
+      Species_1 == "548_1" | Species_1 == "7346_1"
+  )
+AO <- AO %>% filter(Species_2 == "SUPER_13_unloc_2_RagTag")
+
+AO <- AO %>% filter(L1 > 500)
+
+# add fill colour
+AO$fill <- "CCCCCC"
+
+# select alignment region and write file
+AO_main <- AO  %>% filter(End_2 < 5500000)
+
+# flip coordinates in one contig
+end <- max(AO_main$Start_1[AO_main$Species_1 == "962_1"]) + 1
+
+AO_main$Start_1[AO_main$Species_1 == "962_1"] <-
+  end - AO_main$Start_1[AO_main$Species_1 == "962_1"]
+AO_main$End_1[AO_main$Species_1 == "962_1"] <-
+  end - AO_main$End_1[AO_main$Species_1 == "962_1"]
+
+#write.csv(AO_main, "~/Dropbox/VR/Isen_assembly/synteny_OIsen_AIele.csv", row.names = F, quote = F)
+syn <-
+  read.csv(
+    "~/Dropbox/VR/Isen_assembly/synteny_OIsen_AIele.csv",
+    header = T,
+    sep = ","
+  )[, -7]
+
+# rename species as numbers
+syn$Species_1 <- gsub("962_1", 1, syn$Species_1)
+syn$Species_1 <- gsub("546_1", 3, syn$Species_1)
+syn$Species_1 <- gsub("1486_1", 2, syn$Species_1)
+syn$Species_1 <- gsub("7346_1", 4, syn$Species_1)
+syn$Species_1 <- gsub("548_1", 5, syn$Species_1)
+syn$Species_1 <- as.numeric(syn$Species_1)
+syn$Species_2 <-
+  as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_2))
+
+# mark shared internal region in black
+for (i in 1:nrow(syn)) {
+  if (syn$Start_2[i] > 600000 & syn$Start_2[i] < 1000000) {
+    syn$fill[i] <- "000000"
+  }
+}
+
+# order by colour
+syn <- syn[rev(order(syn$fill)), ]
+
+# read karyotype info
+kar <-
+  read.csv(
+    "~/Dropbox/VR/Isen_assembly/karyotype_OIsen_AIele.csv",
+    header = T,
+    sep = ","
+  )
+
+# save plot
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Isen_assembly/OIsen_AIele.svg")
+```
+
+```{r aln_AvA, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <-
+  c(
+    'Start_2',
+    'End_2',
+    'Start_1',
+    'End_1',
+    'L1',
+    'L2',
+    'Percent',
+    'lenR',
+    'lenQ',
+    'Species_2',
+    'Species_1'
+  )
+AA <-
+  readr::read_csv(file = "~/Dropbox/VR/Isen_assembly/nucmer_aln_Afem_Isen_Afem_Iele.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames)
+
+# filter columns
+AA <- AA[, -c(6:9)]
+AA <-
+  AA[, c('Species_1',
+         'Start_1',
+         'End_1',
+         'Species_2',
+         'Start_2',
+         'End_2',
+         'L1')]
+
+AA <-
+  AA %>% filter(
+    Species_1 == "3696_1" |
+      Species_1 == "232_1" |
+      Species_1 == "1866_1" |
+      Species_1 == "3574_1" |
+      Species_1 == "5620_1" |
+      Species_1 == "1014_1" |
+      Species_1 == "10712_1" |
+      Species_1 == "21172_1" & End_1 < 500000 | Species_1 == "21516_1"
+  )
+AA <- AA %>% filter(Species_2 == "SUPER_13_unloc_2_RagTag")
+
+AA <- AA %>% filter(L1 > 500)
+
+# add fill colour
+AA$fill <- "CCCCCC"
+
+# select alignment region and write file
+AA_main <- AA  %>% filter(End_2 < 5500000)
+
+# flip coordinates in a couple of contigs
+end <- max(AA_main$End_1[AA_main$Species_1 == "1866_1"]) + 1
+
+AA_main$Start_1[AA_main$Species_1 == "1866_1"] <-
+  end - AA_main$Start_1[AA_main$Species_1 == "1866_1"]
+AA_main$End_1[AA_main$Species_1 == "1866_1"] <-
+  end - AA_main$End_1[AA_main$Species_1 == "1866_1"]
+
+end <- 169900 + 1
+
+AA_main$Start_1[AA_main$Species_1 == "1866_1"] <-
+  end - AA_main$Start_1[AA_main$Species_1 == "1866_1"]
+AA_main$End_1[AA_main$Species_1 == "1866_1"] <-
+  end - AA_main$End_1[AA_main$Species_1 == "1866_1"]
+
+
+end <- max(AA_main$Start_1[AA_main$Species_1 == "21172_1"]) + 1
+
+AA_main$Start_1[AA_main$Species_1 == "21172_1"] <-
+  end - AA_main$Start_1[AA_main$Species_1 == "21172_1"]
+AA_main$End_1[AA_main$Species_1 == "21172_1"] <-
+  end - AA_main$End_1[AA_main$Species_1 == "21172_1"]
+
+#write.csv(AA_main, "~/Dropbox/VR/Isen_assembly/synteny_AIsen_AIele.csv", row.names = F, quote = F)
+syn <-
+  read.csv(
+    "~/Dropbox/VR/Isen_assembly/synteny_AIsen_AIele.csv",
+    header = T,
+    sep = ","
+  )[, -7]
+
+# rename species as numbers
+syn$Species_1 <- gsub("1866_1", 1, syn$Species_1)
+syn$Species_1 <- gsub("5620_1", 2, syn$Species_1)
+syn$Species_1 <- gsub("21516_1", 3, syn$Species_1)
+syn$Species_1 <- gsub("3574_1", 5, syn$Species_1)
+syn$Species_1 <- gsub("21172_1", 6, syn$Species_1)
+syn$Species_1 <- gsub("10712_1", 8, syn$Species_1)
+syn$Species_1 <- gsub("3696_1", 7, syn$Species_1)
+syn$Species_1 <- gsub("232_1", 4, syn$Species_1)
+
+syn$Species_1 <- as.numeric(syn$Species_1)
+syn$Species_2 <-
+  as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_2))
+
+# mark shared internal region in black
+for (i in 1:nrow(syn)) {
+  if (syn$Start_2[i] > 600000 & syn$Start_2[i] < 1000000) {
+    syn$fill[i] <- "000000"
+  }
+}
+
+# order by colour
+syn <- syn[rev(order(syn$fill)), ]
+
+# read karyotype info
+kar <-
+  read.csv(
+    "~/Dropbox/VR/Isen_assembly/karyotype_AIsen_AIele.csv",
+    header = T,
+    sep = ","
+  )
+
+# save plot
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Isen_assembly/AIsen_AIele.svg")
+```
+
+
+# Figure 6
+
+This figure summarises annotations and gene expression in the morph locus. Fig. 6b is schematic and was drawn on Inkscape.
+
+## Fig. 6a: Annotating the morph locus
+
+```{r gen_axis, message=FALSE, echo=TRUE, warning=FALSE}
+# define the genome axis
+gtrack <- GenomeAxisTrack()
+```
+
+Create track with genomic content for each morph
+```{r cont_tracks, message=FALSE, echo=TRUE, warning=FALSE}
+# colour palette
+pal <- wes_palette("Zissou1")
+
+# define ranges for each morph
+I_cont <- data.frame( start = c(0, 667000, 1569000), end = c(190000, 888000, 1600000))
+I_ranges <- IRanges(start = I_cont$start, end = I_cont$end)
+I_G <- GRanges(seqnames = "chr13_2", ranges = I_ranges, strand = factor(x = rep("*", 3))) 
+I_track <- AnnotationTrack(I_G, name = "I", fill = pal[3], alpha = 0.9, background.title= "white", col.title = "grey10", fontsize = 8)
+
+A_cont <- data.frame( start = c(0), end = c(1600000))
+A_ranges <- IRanges(start = A_cont$start, end = A_cont$end)
+A_G <- GRanges(seqnames = "chr13_2", ranges = A_ranges, strand = factor(x = rep("*", 1))) 
+A_track <- AnnotationTrack(A_G, name = "A", fill = pal[1], alpha = 0.9, background.title= "white", col.title = "grey10", fontsize = 8)
+
+O_cont <- data.frame( start = c(0, 667000, 1569000), end = c(54000, 888000, 1600000))
+O_ranges <- IRanges(start = O_cont$start, end = O_cont$end)
+O_G <- GRanges(seqnames = "chr13_2", ranges = O_ranges, strand = factor(x = rep("*", 3))) 
+O_track <- AnnotationTrack(O_G, name = "O", fill = pal[5], alpha = 0.9, background.title= "white", col.title = "grey10", fontsize = 8)
+```
+
+Prepare TE data
+```{r prepare_TE_track, message=FALSE, echo=TRUE, warning=FALSE}
+# read files with TE annotations
+fp <- "~/Dropbox/VR/repeats/A_ref/"
+prefix <- "Afem_Shasta1_polished_ragtag_UPPER.fa.out_"
+sufix <- "_RagTag.elem_sorted.csv"
+
+Chr <-
+  c(
+    "SUPER_1",
+    "SUPER_2",
+    "SUPER_3",
+    "SUPER_4",
+    "SUPER_5",
+    "SUPER_6",
+    "SUPER_7",
+    "SUPER_8",
+    "SUPER_9",
+    "SUPER_10",
+    "SUPER_11",
+    "SUPER_12",
+    "SUPER_13",
+    "SUPER_13_unloc_1",
+    "SUPER_13_unloc_2",
+    "SUPER_13_unloc_3",
+    "SUPER_13_unloc_4",
+    "SUPER_X"
+  )
+
+# create table with TE coverage per window
+w_size <- 1550000
+
+rep_dat <- tibble()
+
+for (k in Chr) {
+  dat <-
+    # read chromosome annotations
+    read.csv(paste0(fp, prefix, k, sufix),
+             header = T,
+             sep = "\t")[, c(5:8, 10, 11, 15)]
+  # create windows
+  n_window <- ceiling(max(dat$End.) / w_size)
+  # count TEs in window
+  n_rep <- nrow(dat)
+  for (i in 1:n_window) {
+    for (j in 1:n_rep) {
+      # assign TEs to window
+      if (dat$End.[j] <= i * w_size &&
+          dat$End.[j] > (i - 1) * w_size) {
+        dat$Window[j] <- i
+      }
+    }
+  }
+  
+  # drop the last window (shorter than window size)
+  dat <- dat[dat$Window < n_window,]
+  
+  # add last chromosome to data frame
+  rep_dat <- bind_rows(rep_dat, dat)
+}
+```
+
+
+Create track with Jockey element annotations
+```{r TE_track, message=FALSE, echo=TRUE, warning=FALSE}
+# select Jockey data
+rep_Jockey <- rep_dat[rep_dat$Family == "LINE/I-Jockey" & rep_dat$Query == "SUPER_13_unloc_2_RagTag",]
+
+# define ranges
+rep_ranges <- IRanges(start = rep_Jockey$Beg., end = rep_Jockey$End.)
+n = nrow(rep_Jockey)
+rep_G <- GRanges(seqnames = "chr13_2", ranges = rep_ranges, strand = factor(x = rep("*", n)), Jockey = rep(0,n))
+
+# create track
+rep_track <- DataTrack(range = rep_G,  name = "Jockey\nelements", chromosome = "chr13_2", col = "black", pch = 15, cex = 1, type = "p", showAxis = FALSE, background.title= "white", col.title = "grey10", fontsize = 8, alpha = 0.9)
+```
+
+Create track with mapping locations of A reads at inversion breakpoints in O
+```{r inv_track, message=FALSE, echo=TRUE, warning=FALSE}
+# read the data
+rdat1 <- read.table("~/Dropbox/VR/SV/AvO_3K.tsv", header = F)
+colnames(rdat1) <- c("pos", "ind")
+
+# add morph
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+rdat1 <- left_join(rdat1, pop, by = c("ind")) %>% arrange(pop) 
+
+# filter As
+Ainv_dat <- unique(rdat1$pos[rdat1$pop == "A"])
+
+# define ranges
+inv_ranges <-IRanges(start = Ainv_dat, end = Ainv_dat + 1 )
+n <- length(Ainv_dat)
+Ainv_G <- GRanges(seqnames = "chr13_2", ranges = inv_ranges, strand = factor(x = rep("*", n)), inv = rep(0,n))
+
+# create track
+inv_track <- DataTrack(range = Ainv_G,  name = "Inversion\nbreakpoints", chromosome = "chr13_2", col = pal[1], type = "p", background.title= "white", col.title = "grey10", fontsize = 8, alpha = 0.9)
+```
+
+Create track with gene models
+```{r gene_tracks, message=FALSE, echo=TRUE, warning=FALSE}
+gene_models_s <- read.csv("~/Dropbox/VR/ISCH_genome/Candidate_annotation/gene_models_shared_trancripts_simple.csv", header = T)
+
+grtrack <- GeneRegionTrack(gene_models_s,name = "Transcripts", feature=as.vector(gene_models_s$color), red=pal[5], grey = "grey10", blue=pal[1], geneSymbol = FALSE, showId =FALSE, background.title= "white", col.title = "grey10", fontsize = 8, col = NULL, alpha = 0.9)
+```
+
+Plot all tracks
+```{r plot_tracks, message=FALSE, echo=TRUE, warning=FALSE}
+plotTracks(list(gtrack, I_track, A_track, O_track, rep_track, inv_track, grtrack), showAxis = FALSE, from = 0, to = 1600000, legend = T, sizes= c(0.5,0.33, 0.33, 0.33, 1, 1, 1)  )
+```
+
+# Extended Data Fig. 1
+
+This figure summarises the data used and analyses conducted in this study. I created it on Inkscape.
+
+# Extended Data Fig. 2
+
+This figure shows the Samplot output showing an inversion signature in *A* and *I* females compared to *O* females. The figure was generated using [Samplot](https://github.com/ryanlayer/samplot) with minor aesthetic edits in Inkscape.
+
+# Extended Data Fig. 3
+
+This figure shows the mapping locations on the *A* assembly of reads which mapped on inversion breakpoints on the *O* reference assembly.
+
+## Extended Data Fig. 3a: first breakpoint
+```{r, first_breakpoint, message=FALSE, echo=TRUE, warning=FALSE}
+# read mapping data
+rdat1 <- read.table("~/Dropbox/VR/SV/AvO_3K.tsv", header = F)
+colnames(rdat1) <- c("pos", "ind")
+
+# read morph data
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+
+# rearrange
+dat <- left_join(rdat1, pop, by = c("ind")) %>% arrange(pop)
+dat$ind <- factor(dat$ind, levels = unique(dat$ind))
+
+# plot
+pal <- wes_palette("Zissou1")[c(1, 3, 5)]
+
+rd_plot <- dat %>%
+  ggplot(aes(x = pos / 1000, y = ind, colour = pop)) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  scale_colour_manual(values = pal, name = "Morph") +
+  labs(y = "Sample",
+       x = "Position (kb) on scaffold 2 (Chr 13)",
+       title = ~ bold("a")) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.y = element_blank(),
+        #panel.grid = element_blank(),
+        legend.position = "right")
+```
+
+## Extended Data Fig. 3b: Second breakpoint
+```{r Second_breakpoint, message=FALSE, echo=TRUE, warning=FALSE}
+# read mapping data
+rdat2 <- read.table("~/Dropbox/VR/SV/AvO_22K.tsv", header = F)
+colnames(rdat2) <- c("pos", "ind")
+
+# read morph data
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+
+# rearrange
+dat2 <- left_join(rdat2, pop, by = c("ind")) %>% arrange(pop) 
+dat2$ind <- factor(dat2$ind, levels = unique(dat2$ind))
+
+# plot
+pal <- wes_palette("Zissou1")[c(1,3,5)]
+
+rd_plot2 <- dat2 %>%
+  ggplot(aes(x = pos/1000, y = ind, colour = pop)) +
+  #geom_rect(xmin = 122000, xmax=140000, ymin = 0, ymax=57, fill = "gray90", alpha = 0.3, lty = 0) +
+ geom_point(size = 0.5, alpha =0.5) +
+  scale_colour_manual(values = pal, name = "Morph") +
+   labs(y="Sample", x = "Position (kb) on scaffold 2 (Chr 13)", title = ~bold("b")) +
+  theme_minimal(base_size = 9) + 
+  theme(axis.text.y = element_blank(),
+        #panel.grid = element_blank(),
+        legend.position = "right")
+
+# plot both panels at once
+read_plots <- grid.arrange(rd_plot, rd_plot2, ncol = 1)
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/FigS4_V2.pdf", plot = read_plots , width = 160, height = 160, units = "mm")
+```
+
+# Extended Data Fig. 4
+
+This figure shows the Samplot output showing large inversion signature in *I* females compared to *A* females, consisted with an inverted translocation. The figure was generated using [Samplot](https://github.com/ryanlayer/samplot) with minor aesthetic edits in Inkscape.
+
+# Extended Data Fig. 5
+
+This figure shows ld estimates across 15 mb regions in all chromosomes and all unlocalized scafflods of chromosome 13.
+
+First define plotting function taken from [royfrancis.com](https://www.royfrancis.com/fast-ld-computation-from-vcf-files-using-tomahawk/)
+
+```{r ld_function, message=FALSE, echo=TRUE, warning=FALSE}
+# Colour palette for heatmap
+pal  <- rev(wes_palette("Zissou1"))
+
+# function
+#' @title plotPairwiseLD
+#' @description Plots R2 heatmap across the chromosome (like Haploview)
+#' @param dfr A data.frame with minimum CHROM_A, POS_A, CHROM_B, POS_B and R2.
+#' An output from tomahawk works.
+#' @param chr A chromosome name.
+#' @param xlim A two number vector specifying min and max x-axis limits. Any one or both can be defaulted by specifying NA.
+#' @param ylim A two number vector specifying min and max y-axis limits. Any one or both can be defaulted by specifying NA.
+#' @param minr2 A value between 0 and 1. All SNPs with R2 value below this
+#' value is excluded from plot.
+
+plotPairwiseLD <- function(dfr, chr, xlim = c(NA, NA), ylim = c(NA, NA), minr2) {
+  if (missing(dfr)) stop("Input data.frame 'dfr' missing.")
+  
+  ld <- filter(dfr, BP_A < BP_B)
+  
+  if (!missing(minr2)) {
+    ld <- filter(ld, R2 > get("minr2"))
+  }
+  
+  ld <- ld %>% arrange(R2)
+  
+  ld$x <- ld$BP_A + ((ld$BP_B - ld$BP_A) / 2)
+  ld$y <- ld$BP_B - ld$BP_A
+  ld$r2c <- cut(ld$R2, breaks = seq(0, 1, 0.2), labels = c(
+    "0-0 - 0.2", "0.2 - 0.4",
+    "0.4 - 0.6", "0.6 - 0.8",
+    "0.8 - 1.0"
+  ))
+  ld$r2c <- factor(ld$r2c, levels = rev(c(
+    "0-0 - 0.2", "0.2 - 0.4",
+    "0.4 - 0.6", "0.6 - 0.8",
+    "0.8 - 1.0"
+  )))
+  
+  ggplot(ld, aes(x = x/1000000, y = y/1000000, col = r2c)) +
+    geom_point(shape = 20, size = 0.005, alpha = 0.8) +
+    scale_color_manual(values = pal) +
+    scale_x_continuous(limits = xlim) +
+    scale_y_continuous(limits = ylim) +
+    guides(colour = guide_legend(title = "R2", override.aes = list(shape = 20))) +
+    labs(x = "Position (mb)", y = "", title = chr) +
+    theme_minimal(base_size = 6) +
+    theme(
+      panel.border = element_blank(),
+      axis.ticks = element_blank(), 
+      panel.grid = element_blank(),
+      legend.position = "none",
+    ) %>%
+    return()
+}
+```
+
+```{r make-ld-plots, message=FALSE, echo=TRUE, warning=FALSE}
+ld_1 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_1_allr.ld"), header = T)[-c(3, 6)]
+chr_1 <- plotPairwiseLD(ld_1, chr = "1", minr2 = 0.2)
+
+ld_2 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_2_allr.ld"), header = T)[-c(3, 6)]
+chr_2 <- plotPairwiseLD(ld_2, chr = "2", minr2 = 0.2)
+
+ld_3 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_3_allr.ld"), header = T)[-c(3, 6)]
+chr_3 <- plotPairwiseLD(ld_3, chr = "3", minr2 = 0.2)
+
+ld_4 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_4_allr.ld"), header = T)[-c(3, 6)]
+chr_4 <- plotPairwiseLD(ld_4, chr = "4", minr2 = 0.2)
+
+ld_5 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_5_allr.ld"), header = T)[-c(3, 6)]
+chr_5 <- plotPairwiseLD(ld_5, chr = "5", minr2 = 0.2)
+
+ld_6 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_6_allr.ld"), header = T)[-c(3, 6)]
+chr_6 <- plotPairwiseLD(ld_6, chr = "6", minr2 = 0.2)
+
+ld_7 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_7_allr.ld"), header = T)[-c(3, 6)]
+chr_7 <- plotPairwiseLD(ld_7, chr = "7", minr2 = 0.2)
+
+ld_8 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_8_allr.ld"), header = T)[-c(3, 6)]
+chr_8 <- plotPairwiseLD(ld_8, chr = "8", minr2 = 0.2)
+
+ld_9 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_9_allr.ld"), header = T)[-c(3, 6)]
+chr_9 <- plotPairwiseLD(ld_9, chr = "9", minr2 = 0.2)
+
+ld_10 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_10_allr.ld"), header = T)[-c(3, 6)]
+chr_10 <- plotPairwiseLD(ld_10, chr = "10", minr2 = 0.2)
+
+ld_11 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_11_allr.ld"), header = T)[-c(3, 6)]
+chr_11 <- plotPairwiseLD(ld_11, chr = "11", minr2 = 0.2)
+
+ld_12 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_12_allr.ld"), header = T)[-c(3, 6)]
+chr_12 <- plotPairwiseLD(ld_12, chr = "12", minr2 = 0.2)
+
+ld_X <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_X_allr.ld"), header = T)[-c(3, 6)]
+chr_X <- plotPairwiseLD(ld_X, chr = "X", minr2 = 0.2)
+
+ld_13 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_13_allr.ld"), header = T)[-c(3, 6)]
+chr_13 <- plotPairwiseLD(dfr = ld_13, chr = "13", minr2 = 0.2)
+
+ld_13_1 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_13_unloc_1_allr.ld"),
+             header = T)[-c(3, 6)]
+unloc_1 <-
+  plotPairwiseLD(dfr = ld_13_1, chr = "13 unloc 1", minr2 = 0.2)
+
+ld_13_2 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_13_unloc_2_allr.ld"),
+             header = T)[-c(3, 6)]
+unloc_2 <-
+  plotPairwiseLD(dfr = ld_13_2, chr = "13 unloc 2", minr2 = 0.2)
+
+ld_13_3 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_13_unloc_3_allr.ld"),
+             header = T)[-c(3, 6)]
+unloc_3 <-
+  plotPairwiseLD(dfr = ld_13_3, chr = "13 unloc 3", minr2 = 0.2)
+
+ld_13_4 <-
+  read.table(paste0 ("~/Dropbox/VR/ld/A1354_SUPER_13_unloc_4_allr.ld"),
+             header = T)[-c(3, 6)]
+unloc_4 <-
+  plotPairwiseLD(dfr = ld_13_4, chr = "13 unloc 4", minr2 = 0.2)
+
+rm(
+  ld_1,
+  ld_2,
+  ld_3,
+  ld_4,
+  ld_5,
+  ld_6,
+  ld_7,
+  ld_8,
+  ld_9,
+  ld_10,
+  ld_11,
+  ld_11,
+  ld_12,
+  ld_13,
+  ld_13_1,
+  ld_13_2,
+  ld_13_3,
+  ld_13_4,
+  ld_X
+)
+```
+
+```{r plot-aal-ld,message=FALSE, echo=TRUE, warning=FALSE}
+ld_plots <-
+  grid.arrange(
+    chr_1,
+    chr_2,
+    chr_3,
+    chr_4,
+    chr_5,
+    chr_6,
+    chr_7,
+    chr_8,
+    chr_9,
+    chr_10,
+    chr_11,
+    chr_12,
+    chr_13,
+    unloc_1,
+    unloc_2,
+    unloc_3,
+    unloc_4,
+    chr_X,
+    ncol = 6
+  )
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/FigS7.png", plot = ld_plots , width = 210, height = 120, units = "mm")
+```
+
+# Extended Data Fig. 6
+
+This figure shows TE coverage across the genome in 1.5 mb windows, with an emphasis in contrasting chromosome 13 against the rest of the genome.
+
+Prepare data
+```{r prep_TE, message=FALSE, echo=TRUE, warning=FALSE}
+# remove double counted TEs
+rep_dat <- rep_dat %>% filter(!grepl("/", ID))
+
+# create data frame of coverage by window
+all_reps <- rep_dat %>%
+  group_by(Window, Query) %>%
+  summarise(length = sum(Length), n = n())
+
+# create variable to indicate whether a window is in chr 13
+for (i in 1:nrow(all_reps)) {
+  if (grepl(pattern = "SUPER_13", x = all_reps$Query[i])) {
+    all_reps$region[i] <- all_reps$Query[i]
+  }
+  else {
+    all_reps$region[i] <- "main"
+  }
+}
+
+# compute upper range of TE coverage outside chr 13
+allreps_95 <-
+  quantile(all_reps$length[all_reps$region == "main"], probs = 0.95) / w_size
+```
+
+Plot
+```{r plot_TE, message=FALSE, echo=TRUE, warning=FALSE}
+pal <- wes_palette("Zissou1")
+
+all_reps_p <-
+  ggplot(data = all_reps,
+         aes(
+           x = region,
+           y = length / w_size,
+           colour = region,
+           size = region
+         )) +
+  geom_jitter(width = 0.2, size = 0.3) +
+  geom_hline(yintercept = allreps_95,
+             lty = 2,
+             colour = "gray80") +
+  theme_minimal(base_size = 7) +
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  ) +
+  scale_colour_manual(
+    values = c("grey", pal),
+    labels = c(
+      "genome wide",
+      "Chr 13",
+      "Chr 13_1",
+      "Chr 13_2",
+      "Chr 13_3",
+      "Chr 13_4"
+    ),
+    name = "Region"
+  ) +
+  labs(y = "TE coverage", x = "Region") +
+  scale_x_discrete(labels = c(
+    "genome wide",
+    "Chr 13",
+    "Chr 13_1",
+    "Chr 13_2",
+    "Chr 13_3",
+    "Chr 13_4"
+  )) +
+  scale_size_manual(values = c(0.5, rep(1.5, 5)))
+
+all_reps_p
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/TE_main.pdf", plot = all_reps_p, width = 80, height = 60, units = "mm")
+```
+
+# Extended Data Fig. 7
+
+This figure provides further evidence of a shared basis of male mimicry in *I. elegans* and *I. senegalensis*. Extended Data Fig. 7a shows the same inversion signature in *A* females of *I. senegalensis* as found for *A* females of *I. elegans*, relative to an *O* reference. The figure was generated using [Samplot](https://github.com/ryanlayer/samplot) with minor aesthetic edits in Inkscape. Extended Data Figs. 7b and 7c shows the mapping locations on the *A* assembly of *I. senegalensis* reads which mapped on inversion breakpoints on the *O* reference assembly.
+
+## Extended Data Fig. 7b: First breakpoint
+```{r sen_first_breakpoint, message=FALSE, echo=TRUE, warning=FALSE}
+# read mapping data
+srdat1 <- read.table("~/Dropbox/VR/SV/AvO_sen_3K.tsv", header = F)
+colnames(srdat1) <- c("pos", "ind")
+
+# flip coords to match DToL assembly
+srdat1$pos <- 1541068 - srdat1$pos
+
+# sample data
+pop <-
+  data.frame(pop = c("A", "O"),
+             ind = c("wHADPI032623-101", "wHADPI032624-90"))
+
+# make data frame for plotting
+dat <- left_join(srdat1, pop, by = c("ind")) %>% arrange(pop)
+dat$ind <- factor(dat$ind, levels = unique(dat$ind))
+
+# plot
+pal <- wes_palette("Zissou1")[c(1, 5)]
+
+sr_sen <- dat %>%
+  ggplot(aes(x = pos / 1000, y = ind, colour = pop)) +
+  geom_point(size = 1.5, alpha = 0.5) +
+  scale_colour_manual(values = pal,
+                      name = "Morph",
+                      labels = c("A", "O-like")) +
+  labs(y = "Sample", x = "Position (kb) on scaffold 2 (Chr 13)") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.y = element_blank(),
+        #panel.grid = element_blank(),
+        legend.position = "right")
+```
+
+## Extended Data Fig. 7c: Second breakpoint
+```{r sen_second_breakpoint, message=FALSE, echo=TRUE, warning=FALSE}
+# read mapping data
+srdat2 <- read.table("~/Dropbox/VR/SV/AvO_sen_22K.tsv", header = F)
+colnames(srdat2) <- c("pos", "ind")
+
+# flip coords to match DToL assembly
+srdat2$pos <- 1541068 - srdat2$pos
+
+# sample data
+pop <-
+  data.frame(pop = c("A", "O"),
+             ind = c("wHADPI032623-101", "wHADPI032624-90"))
+
+# make data frame for plotting
+dat2 <- left_join(srdat2, pop, by = c("ind")) %>% arrange(pop)
+dat2$ind <- factor(dat2$ind, levels = unique(dat2$ind))
+
+# plot
+pal <- wes_palette("Zissou1")[c(1, 5)]
+
+sr_sen2 <- dat2 %>%
+  ggplot(aes(x = pos / 1000, y = ind, colour = pop)) +
+  geom_point(size = 1.5, alpha = 0.5) +
+  scale_colour_manual(values = pal,
+                      name = "Morph",
+                      labels = c("A", "O-like")) +
+  labs(y = "Sample", x = "Position (kb) on scaffold 2 (Chr 13)") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.y = element_blank(),
+        #panel.grid = element_blank(),
+        legend.position = "right")
+
+# Plot both panels in one
+sen_read_plots <- grid.arrange(sr_sen, sr_sen2, ncol = 1)
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/FigS10_V2.pdf", plot = sen_read_plots , width = 160, height = 80, units = "mm")
+```
+
+# Extended Data Fig. 8
+
+This figure describes the morph locus in the *I* haplotype.
+```{r gen_track_I, message=FALSE, echo=TRUE, warning=FALSE}
+# define the genome access
+gtrack <- GenomeAxisTrack()
+```
+
+Create track with genomic content for each morph
+```{r cont_tracks_I, message=FALSE, echo=TRUE, warning=FALSE}
+# colour palette
+pal <- wes_palette("Zissou1")
+
+# define ranges for each morph
+I_cont <- data.frame(start = c(312420), end = c(3800000))
+I_ranges <- IRanges(start = I_cont$start, end = I_cont$end)
+I_G <-
+  GRanges(seqnames = "chr13_2",
+          ranges = I_ranges,
+          strand = factor(x = rep("*", 1)))
+I_track <-
+  AnnotationTrack(
+    I_G,
+    name = "I",
+    fill = pal[3],
+    alpha = 0.9,
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8
+  )
+
+A_cont <- data.frame(start = c(312420), end = c(3800000))
+A_ranges <- IRanges(start = A_cont$start, end = A_cont$end)
+A_G <-
+  GRanges(seqnames = "chr13_2",
+          ranges = A_ranges,
+          strand = factor(x = rep("*", 1)))
+A_track <-
+  AnnotationTrack(
+    A_G,
+    name = "A",
+    fill = pal[1],
+    alpha = 0.9,
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8
+  )
+
+O_cont <-
+  data.frame(start = c(312420, 3710000),
+             end = c(3529500, 3800000))
+O_ranges <- IRanges(start = O_cont$start, end = O_cont$end)
+O_G <-
+  GRanges(seqnames = "chr13_2",
+          ranges = O_ranges,
+          strand = factor(x = rep("*", 2)))
+O_track <-
+  AnnotationTrack(
+    O_G,
+    name = "O",
+    fill = pal[5],
+    alpha = 0.9,
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8
+  )
+```
+
+Create track with Jockey element annotations
+```{r TE_track_I, message=FALSE, echo=TRUE, warning=FALSE}
+# select Jockey data
+Ifem_rep <-
+  read.csv(
+    "~/Dropbox/VR/repeats/I_ref/Ifem_Shasta2_polished_ragtag_UPPER.fa.out_SUPER_13_unloc_2_RagTag.elem_sorted.csv",
+    header = T,
+    sep = "\t"
+  )[, c(5:8, 10, 11, 15)]
+
+rep_Jockey <-
+  Ifem_rep %>% filter(!grepl("/", ID)) %>% filter(grepl("LINE/I-Jockey", Family)) %>% filter (Beg. > 312420) %>% filter (Beg. < 3800000)
+
+# define ranges
+rep_ranges <-
+  IRanges(start = rep_Jockey$Beg., end = rep_Jockey$End.)
+n = nrow(rep_Jockey)
+rep_G <-
+  GRanges(
+    seqnames = "chr13_2",
+    ranges = rep_ranges,
+    strand = factor(x = rep("*", n)),
+    Jockey = rep(0, n)
+  )
+
+# create track
+rep_track <-
+  DataTrack(
+    range = rep_G,
+    name = "Jockey\nelements",
+    chromosome = "chr13_2",
+    col = "black",
+    pch = 15,
+    cex = 1,
+    type = "p",
+    showAxis = FALSE,
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8,
+    alpha = 0.9
+  )
+```
+
+Create track with mapping locations of A reads at inversion breakpoints in O
+```{r inv_tracks_I, message=FALSE, echo=TRUE, warning=FALSE}
+# read the data
+rdat1 <- read.table("~/Dropbox/VR/SV/IvO_3K.tsv", header = F)
+colnames(rdat1) <- c("pos", "ind")
+
+# add morph
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+rdat1 <- left_join(rdat1, pop, by = c("ind")) %>% arrange(pop)
+
+# filter As and Is
+Ainv_dat <- unique(rdat1$pos[rdat1$pop == "A"])
+Iinv_dat <- unique(rdat1$pos[rdat1$pop == "I"])
+
+# define ranges
+inv_ranges <- IRanges(start = Ainv_dat, end = Ainv_dat + 1)
+n <- length(Ainv_dat)
+Ainv_G <-
+  GRanges(
+    seqnames = "chr13_2",
+    ranges = inv_ranges,
+    strand = factor(x = rep("*", n)),
+    inv = rep(0, n)
+  )
+
+inv_I_ranges <- IRanges(start = Iinv_dat, end = Iinv_dat + 1)
+n <- length(Iinv_dat)
+Iinv_G <-
+  GRanges(
+    seqnames = "chr13_2",
+    ranges = inv_I_ranges,
+    strand = factor(x = rep("*", n)),
+    inv = rep(0, n)
+  )
+
+# create tracks
+inv_track <-
+  DataTrack(
+    range = Ainv_G,
+    name = "Inversion\nbreakpoints",
+    chromosome = "chr13_2",
+    col = pal[1],
+    type = "p",
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8,
+    alpha = 0.9
+  )
+
+# create tracks
+inv_I_track <-
+  DataTrack(
+    range = Iinv_G,
+    name = "Inversion\nbreakpoints",
+    chromosome = "chr13_2",
+    col = pal[3],
+    type = "p",
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8,
+    alpha = 0.9
+  )
+```
+
+Create track with gene models
+```{r gene_track_I, message=FALSE, echo=TRUE, warning=FALSE}
+gene_models_s <-
+  read.csv(
+    "~/Dropbox/VR/ISCH_genome/Candidate_annotation/gene_models_shared_trancripts_simple_I.csv",
+    header = T
+  )
+
+grtrack <-
+  GeneRegionTrack(
+    gene_models_s,
+    name = "Transcripts",
+    feature = as.vector(gene_models_s$color),
+    red = pal[5],
+    grey = "grey10",
+    blue = pal[1],
+    geneSymbol = FALSE,
+    showId = FALSE,
+    background.title = "white",
+    col.title = "grey10",
+    fontsize = 8,
+    col = NULL,
+    alpha = 0.9
+  )
+```
+
+Plot all tracks
+```{r plot_tracks_I, message=FALSE, echo=TRUE, warning=FALSE}
+plotTracks(
+  list(
+    gtrack,
+    I_track,
+    A_track,
+    O_track,
+    rep_track,
+    inv_track,
+    inv_I_track,
+    grtrack
+  ),
+  showAxis = FALSE,
+  from = 300000,
+  to = 800000,
+  legend = T,
+  sizes = c(1, 0.33, 0.33, 0.33, 1, 1, 1, 0.5)
+)
+
+plotTracks(
+  list(
+    gtrack,
+    I_track,
+    A_track,
+    O_track,
+    rep_track,
+    inv_track,
+    inv_I_track,
+    grtrack
+  ),
+  showAxis = FALSE,
+  from = 3300000,
+  to = 3800000,
+  legend = T,
+  sizes = c(1, 0.33, 0.33, 0.33, 1, 1, 1, 0.5)
+)
+```
+
+# Extended Data Fig. 9
+
+This figure is analogous to Fig. 2 but using the DToL assembly as mapping reference.
+
+## Extended Data Fig. 9a: full GWAS
+
+### AvO
+```{r GWAS_AvO_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered GWAS output
+ToL_AvO <-
+  read.table("~/Dropbox/VR/GWAS/ToL_AvO.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+
+# rename columns
+colnames(ToL_AvO) <-
+  c("CHR", "BP", "A1" , "FA", "FU", "A2", "CHISQ", "P")
+
+# order chromosomes by size
+ToL_AvO$CHR <-
+  ordered(
+    ToL_AvO$CHR,
+    levels = c(
+      "SUPER_1",
+      "SUPER_2",
+      "SUPER_3",
+      "SUPER_4",
+      "SUPER_5",
+      "SUPER_6",
+      "SUPER_7",
+      "SUPER_8",
+      "SUPER_9",
+      "SUPER_10",
+      "SUPER_11",
+      "SUPER_12",
+      "SUPER_13",
+      "SUPER_13_unloc_1",
+      "SUPER_13_unloc_2",
+      "SUPER_13_unloc_3",
+      "SUPER_13_unloc_4",
+      "SUPER_X"
+    )
+  )
+
+AvO <- ToL_AvO %>%
+  # compute chromosome size
+  dplyr::group_by(CHR) %>%
+  dplyr::summarise(chr_len = max(BP)) %>%
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot = cumsum(chr_len) - chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(ToL_AvO, ., by = c("CHR" = "CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum = BP + tot)
+
+# simplify chromosome names
+levels(AvO$CHR) <-
+  c(
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "13",
+    "13",
+    "13",
+    "13",
+    "X"
+  )
+
+# change cumulative positions to chromosome scale
+AvO_p <- AvO %>%
+  dplyr::mutate(chr_num = as.numeric(CHR)) %>%
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p = BP + tot + (chr_num - 1) * 10000000)
+
+# make a data frame with the center position of each chromosome
+axisdf = AvO_p %>% dplyr::group_by(CHR) %>% dplyr::summarize(center = (max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p))) / 2)
+
+# plot
+AvO_T <- ggplot(AvO_p, aes(x = BPcum_p, y = -log10(P))) +
+  
+  # show all points
+  geom_point(
+    aes(colour = as.factor(CHR)),
+    alpha = 0.5,
+    size = 0.5,
+    stroke = 0.5
+  ) +
+  scale_color_manual(values = rep(c("grey5", "#FF6666"), 7)) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks = axisdf$center) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  ylim(2, 12) +
+  # labels
+  labs(x = "Chromosome", title = "A vs O") +
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    # panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+AvO_T
+```
+
+### AvI
+```{r GWAS_AvI_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered GWAS output
+ToL_AvI <-
+  read.table("~/Dropbox/VR/GWAS/ToL_AvI.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+
+# rename columns
+colnames(ToL_AvI) <-
+  c("CHR", "BP", "A1" , "FA", "FU", "A2", "CHISQ", "P")
+
+# order chromosomes by size
+ToL_AvI$CHR <-
+  ordered(
+    ToL_AvI$CHR,
+    levels = c(
+      "SUPER_1",
+      "SUPER_2",
+      "SUPER_3",
+      "SUPER_4",
+      "SUPER_5",
+      "SUPER_6",
+      "SUPER_7",
+      "SUPER_8",
+      "SUPER_9",
+      "SUPER_10",
+      "SUPER_11",
+      "SUPER_12",
+      "SUPER_13",
+      "SUPER_13_unloc_1",
+      "SUPER_13_unloc_2",
+      "SUPER_13_unloc_3",
+      "SUPER_13_unloc_4",
+      "SUPER_X"
+    )
+  )
+
+AvI <- ToL_AvI %>%
+  # compute chromosome size
+  dplyr::group_by(CHR) %>%
+  dplyr::summarise(chr_len = max(BP)) %>%
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot = cumsum(chr_len) - chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(ToL_AvI, ., by = c("CHR" = "CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum = BP + tot)
+
+# simplify chromosome names
+levels(AvI$CHR) <-
+  c(
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "13",
+    "13",
+    "13",
+    "13",
+    "X"
+  )
+
+# change cumulative positions to chromosome scale
+AvI_p <- AvI %>%
+  dplyr::mutate(chr_num = as.numeric(CHR)) %>%
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p = BP + tot + (chr_num - 1) * 10000000)
+
+# make a data frame with the center position of each chromosome
+axisdf = AvI_p %>% dplyr::group_by(CHR) %>% dplyr::summarize(center = (max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p))) / 2)
+
+# plot
+AvI_T <- ggplot(AvI_p, aes(x = BPcum_p, y = -log10(P))) +
+  
+  # show all points
+  geom_point(
+    aes(colour = as.factor(CHR)),
+    alpha = 0.5,
+    size = 0.5,
+    stroke = 0.5
+  ) +
+  scale_color_manual(values = rep(c("grey50", "#FF6666"), 7)) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks = axisdf$center) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  # labels
+  labs(x = "Chromosome", title = "A vs I") +
+  ylim(2, 12) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+AvI_T
+```
+
+### IvO
+```{r GWAS_IvO_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered GWAS output
+ToL_IvO <-
+  read.table("~/Dropbox/VR/GWAS/ToL_IvO.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+
+# rename columns
+colnames(ToL_IvO) <-
+  c("CHR", "BP", "A1" , "FA", "FU", "A2", "CHISQ", "P")
+
+# order chromosomes by size
+ToL_IvO$CHR <-
+  ordered(
+    ToL_IvO$CHR,
+    levels = c(
+      "SUPER_1",
+      "SUPER_2",
+      "SUPER_3",
+      "SUPER_4",
+      "SUPER_5",
+      "SUPER_6",
+      "SUPER_7",
+      "SUPER_8",
+      "SUPER_9",
+      "SUPER_10",
+      "SUPER_11",
+      "SUPER_12",
+      "SUPER_13",
+      "SUPER_13_unloc_1",
+      "SUPER_13_unloc_2",
+      "SUPER_13_unloc_3",
+      "SUPER_13_unloc_4",
+      "SUPER_X"
+    )
+  )
+
+IvO <- ToL_IvO %>%
+  # compute chromosome size
+  dplyr::group_by(CHR) %>%
+  dplyr::summarise(chr_len = max(BP)) %>%
+  
+  # calculate cumulative position of each contig
+  dplyr::mutate(tot = cumsum(chr_len) - chr_len) %>%
+  dplyr::select(-chr_len) %>%
+  
+  # add this info to the initial dataset
+  dplyr::left_join(ToL_IvO, ., by = c("CHR" = "CHR")) %>%
+  
+  # add a cumulative position of each SNP
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum = BP + tot)
+
+# simplify chromosome names
+levels(IvO$CHR) <-
+  c(
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "13",
+    "13",
+    "13",
+    "13",
+    "X"
+  )
+
+# change cumulative positions to chromosome scale
+IvO_p <- IvO %>%
+  dplyr::mutate(chr_num = as.numeric(CHR)) %>%
+  dplyr::arrange(CHR, BP) %>%
+  dplyr::mutate(BPcum_p = BP + tot + (chr_num - 1) * 10000000)
+
+# make a data frame with the center position of each chromosome
+axisdf = IvO_p %>% group_by(CHR) %>% summarize(center = (max(as.numeric(BPcum_p)) + min(as.numeric(BPcum_p))) / 2)
+
+# plot
+IvO_T <- ggplot(IvO_p, aes(x = BPcum_p, y = -log10(P))) +
+  
+  # show all points
+  geom_point(
+    aes(colour = as.factor(CHR)),
+    alpha = 0.5,
+    size = 0.5,
+    stroke = 0.5
+  ) +
+  scale_color_manual(values = rep(c("grey80", "#FF6666"), 7)) +
+  
+  # custom X axis:
+  scale_x_continuous(label = axisdf$CHR, breaks = axisdf$center) +
+  #scale_y_continuous(expand = c(0.1, 0.1) ) +     # remove space between plot area and x axis
+  ylim(2, 12) +
+  # labels
+  labs(x = "Chromosome", title = "I  vs O") +
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+IvO_T
+```
+
+## Extended Data Fig. 9b: Zooming in the region of most significant SNPs
+```{r GWAS_zoom_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read filtered data sets
+ToL_AvO <-
+  read.table("~/Dropbox/VR/GWAS/ToL_AvO.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+ToL_AvI <-
+  read.table("~/Dropbox/VR/GWAS/ToL_AvI.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+ToL_IvO <-
+  read.table("~/Dropbox/VR/GWAS/ToL_IvO.assoc_filtered.txt", header = F)[, c(1, 3:9)]
+
+# select the unlocalized scaffold 2 of chromosome 13
+AvO_2 <- ToL_AvO %>% dplyr::filter(ToL_AvO$V1 == "SUPER_13_unloc_2")
+AvI_2 <- ToL_AvI %>% dplyr::filter(ToL_AvI$V1 == "SUPER_13_unloc_2")
+IvO_2 <- ToL_IvO %>% dplyr::filter(ToL_IvO$V1 == "SUPER_13_unloc_2")
+
+# create column with comparisons
+AvO_2$comp <- "AvO"
+AvI_2$comp <- "AvI"
+IvO_2$comp <- "IvO"
+
+# make data frame with all comparisons
+unloc_2 <- rbind(AvO_2, AvI_2, IvO_2)
+colnames(unloc_2) <-
+  c("CHR", "BP", "A1" , "FA", "FU", "A2", "CHISQ", "P", "COM")
+
+# order comparisons
+unloc_2$COM <- ordered(unloc_2$COM, levels = c("AvO", "AvI", "IvO"))
+
+# plot
+unloc_2_T <- ggplot(unloc_2, aes(x = BP / 1000000, y = -log10(P))) +
+  
+  # show all points
+  geom_point(
+    aes(colour = as.factor(COM), fill = as.factor(COM)),
+    pch = 21,
+    size = 1,
+    stroke = 0.5,
+    alpha = 0.5
+  ) +
+  scale_color_manual(values = c("grey5", "grey50", "grey90")) +
+  scale_fill_manual(values = c("grey5", "grey50", "grey90")) +
+  #scale_alpha_manual(values = c(1,1,1)) +
+  # labels
+  labs(x = "Position on unlocalized scaffold 2 (Chr 13)") +
+  xlim(0.3, 1) +
+  ylim(2, 12) +
+  
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+unloc_2_T
+```
+
+Plot figures 2a-b and export
+```{r GWAS_all_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+lay <- rbind(c(1),
+             c(2),
+             c(3),
+             c(4),
+             c(4))
+
+GWAS_all <-
+  grid.arrange(AvO_T,
+               AvI_T,
+               IvO_T,
+               unloc_2_T,
+               layout_matrix = lay,
+               ncol = 1)
+
+#ggsave(
+#  filename = "~/Dropbox/VR/Writing/Figures/gwas_ToL.pdf",
+#  plot = GWAS_all,
+#  width = 180,
+#  height = 120,
+#  units = "mm"
+#)
+```
+
+## Extended Data Fig. 9c: Fst
+```{r fst_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read pixy output
+fst <- read.table("~/Dropbox/VR/pixy/ToL_30K_fst.txt", header = T)
+
+# negative values to 0
+fst$avg_hudson_fst[fst$avg_hudson_fst < 0] <- 0
+
+# what's the median and range of non 0 Fst values?
+median(fst$avg_hudson_fst[fst$avg_hudson_fst > 0], na.rm = T)
+quantile(fst$avg_hudson_fst[fst$avg_hudson_fst > 0],
+         na.rm = T,
+         probs = c(0.05, 0.95))
+
+# make columns for window md point and comparisons
+fst$midpoint <- (fst$window_pos_1 + fst$window_pos_2) / 2
+fst$comp <- paste0(fst$pop1, "v", fst$pop2)
+
+# select the unlocalized scaffold 2 of chromosome 13
+fst_unloc2 <- fst[fst$chromosome == "SUPER_13_unloc_2", ]
+
+# drop NA windows
+fst_unloc2 <- fst_unloc2[complete.cases(fst_unloc2[, 6]), ]
+
+# plot
+fst_ToL_p <-
+  ggplot(data = fst_unloc2,
+         aes(
+           x = midpoint / 1000000,
+           y = avg_hudson_fst,
+           colour = comp,
+           lty = comp
+         )) +
+  geom_line(aes(colour = as.factor(comp)), size = 0.5,  alpha = 1) +
+  facet_wrap(~ comp, nrow = 3) +
+  scale_color_manual(values = c("#006699", "#3B9AB2", "#9ccccc")) +
+  scale_fill_manual(values = c("#006699", "#3B9AB2", "#9ccccc")) +
+  scale_linetype_manual(values = c("solid", "solid", "solid")) +
+  #scale_alpha_manual(values = c(1,1,1)) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = "Fst") +
+  
+  xlim(0.3, 1) +
+  ylim (0, 0.6) +
+  
+  geom_hline(
+    yintercept = 0.0365,
+    lty = 2,
+    colour = "gray80",
+    size = 0.5
+  ) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+fst_ToL_p
+
+# export
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/fst_ToL.pdf", plot = fst_ToL_p, width = 180, height = 40, units = "mm")
+```
+
+## Extended Data Fig. 9d: Tajima's D
+```{r Tajima_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read VCF tools output
+Tajima <-
+  read.table("~/Dropbox/VR/popgen/ToL_30kb.Tajima.D", header = T)
+#head(Tajima)
+
+# what's the range of genome wide values?
+quantile(Tajima$TajimaD,
+         na.rm = T,
+         probs = c(0.05, 0.95))
+
+# calculate window size and midpoint
+w_size <-
+  Tajima$BIN_START[Tajima$CHROM == "SUPER_1"][2] - Tajima$BIN_START[Tajima$CHROM == "SUPER_1"][1]
+Tajima$midpoint <- (Tajima$BIN_START + w_size / 2)
+
+# select the unlocalized scaffold 2 of chromosome 13
+Taj_unloc2 <- Tajima[Tajima$CHROM == "SUPER_13_unloc_2", ]
+
+# drop NA windows
+Taj_unloc2 <- Taj_unloc2[complete.cases(Taj_unloc2[, 4]), ]
+
+# plot
+Taj_ToL_p <-
+  ggplot(data = Taj_unloc2, aes(x = midpoint / 1000000, y = TajimaD)) +
+  geom_line(colour = pal[5],
+            size = 0.5,
+            alpha = 0.7) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = "Tajima's D") +
+  
+  xlim(0.3, 1) +
+  
+  geom_ribbon(
+    aes(ymin = -1.3296, ymax = 0.4075),
+    lty = 0,
+    fill = "gray90",
+    alpha = 0.2
+  ) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+Taj_ToL_p
+```
+
+## Extended Data Fig. 9e: Nucleotide diversity
+```{r pi_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# read pixy output
+Pi <-
+  read.table("~/Dropbox/VR/pixy/pi/ToL_30K_onepop_pi.txt", header = T)
+#head(Pi)
+
+# what's the range of genome-wide values?
+quantile(Pi$avg_pi, na.rm = T, probs = c(0.05, 0.95))
+
+# compute midpoint
+Pi$midpoint <- (Pi$window_pos_2 + Pi$window_pos_1) / 2
+
+# select the unlocalized scaffold 2 of chromosome 13
+Pi_unloc2 <- Pi[Pi$chromosome == "SUPER_13_unloc_2", ]
+
+# drop NA windows
+Pi_unloc2 <- Pi_unloc2[complete.cases(Pi_unloc2[, 5]), ]
+
+# plot
+Pi_ToL_p <-
+  ggplot(data = Pi_unloc2, aes(x = midpoint / 1000000, y = avg_pi)) +
+  geom_line(colour = "grey5",
+            size = 0.5,
+            alpha = 0.7) +
+  # labels
+  labs(x = "Window midpoint on unlocated scaffold 2 (Chr 13)", y = expression (pi)) +
+  
+  xlim(.3, 1) +
+  ylim (0, 0.04) +
+  
+  geom_ribbon(
+    aes(ymin = 0.002251009, ymax = 0.026671362),
+    lty = 0,
+    fill = "gray80",
+    alpha = 0.2
+  ) +
+  # custom the theme:
+  theme_minimal(base_size = 6) +
+  theme(
+    legend.position = "none",
+    #panel.border = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    axis.text.x = element_text(angle = 0)
+  )
+
+Pi_ToL_p
+```
+
+Plot Tajima's D and pi together and export
+```{r pogen_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+popgen_ToL <- grid.arrange(Taj_ToL_p, Pi_ToL_p, ncol = 1)
+
+ggsave(
+  filename = "~/Dropbox/VR/Writing/Figures/popgen_ToL.pdf",
+  plot = popgen_ToL,
+  width = 180,
+  height = 40,
+  units = "mm"
+)
+```
+
+# Figure S1
+
+This figure shows quality metrics for *I. elegans* morph assemblies through polishing.
+
+```{r AssemblyQC, message=FALSE, echo=TRUE, warning=FALSE}
+# Read assembly statistics
+asmq <-
+  read.csv(
+    "~/Dropbox/VR/Writing/Assembly_statistics.csv",
+    header = T,
+    sep = ","
+  )
+
+# Order factors
+asmq$Buscos <-
+  factor(
+    asmq$Buscos,
+    levels = c(
+      "Missing",
+      "Fragmented",
+      "Complete_duplicated",
+      "Complete_single"
+    )
+  )
+asmq$Version <-  factor(asmq$Version, levels = c("1", "2", "3", "4"))
+
+# Plot BUSCOs
+Buscos <-
+  ggplot(data = asmq, aes(y = Value, x = Version, fill = Buscos))  +
+  geom_bar(
+    stat = "identity",
+    alpha = 0.8,
+    color = "white",
+    lwd = 0.2
+  ) +
+  facet_grid(cols = vars(Assembly)) +
+  labs(x = "Assembly version", y = "% Insect BUSCOs (n = 1367)", title = "a") +
+  theme_light(base_size = 9) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor  = element_blank()) +
+  theme(plot.title = element_text(face = "bold")) +
+  scale_x_discrete(labels = c("Shasta", "+ PEPPER", "+ purge_dups", "+ POLCA")) +
+  scale_fill_manual(
+    values = viridis(
+      4,
+      begin = 0.1,
+      end = 1,
+      direction = -1
+    ),
+    labels = c(
+      "Missing",
+      "Fragmented",
+      "Complete duplicated",
+      "Complete single"
+    )
+  ) +
+  theme(legend.position = "top") +
+  coord_flip()
+
+# Re arrange data to plot other metrics
+#Select one row per step
+stat_dat <- asmq[which(asmq$Buscos == "Missing"),-c(4, 5)]
+
+# Reshape
+stat_dat <-
+  stat_dat %>% pivot_longer(cols = c(4:8), names_to = "statistic")
+
+#Reorder steps
+stat_dat$Steps <-
+  factor(stat_dat$Steps,
+         levels = c("Shasta", "PEPPER", "purge_dups", "polca"))
+
+# list with scales for y
+scales_y <- list(
+  Assembly.size.Gb = scale_y_continuous(limits = c(1.5, 2)),
+  N.contigs = scale_y_continuous(limits = c(1000, 10000)),
+  Average.Contig.Mb = scale_y_continuous(limits = c(0, 1.5)),
+  N50.Mb = scale_y_continuous(limits = c(4, 12)),
+  Percent.abv.50kb = scale_y_continuous(limits = c(95, 100))
+)
+
+# list facet names
+stat_names <- c(
+  Assembly.size.Gb = 'Assembly size (Gb)',
+  Average.Contig.Mb = 'Average contig length (Mb)',
+  N50.Mb = 'N50 (Mb)',
+  N.contigs = 'No. of contigs',
+  Percent.abv.50kb = '% reads in contigs > 50 Kb'
+)
+
+# Plot
+asm_stats <-
+  ggplot(data = stat_dat, aes(x = Steps, y = value, color = Assembly)) +
+  geom_point(size = 3, position = position_dodge(w = 0.3)) +
+  theme_light(base_size = 9) +
+  facet_grid_sc(
+    rows  = vars(statistic),
+    scales = list(y = scales_y),
+    labeller = labeller(statistic = stat_names)
+  ) +
+  labs(x = "Assembly version", title = "b") +
+  scale_x_discrete(labels = c("Shasta", "+ PEPPER", "+ purge_dups", "+ POLCA")) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor  = element_blank()) +
+  theme(plot.title = element_text(face = "bold")) +
+  scale_colour_manual(values = viridis(
+    3,
+    begin = 0.3,
+    end = 1,
+    direction = 1
+  )) +
+  theme(legend.position = "top")
+
+# layout matrix
+layout <- rbind(c(1, 1, 2))
+
+#plot all
+grid.arrange(Buscos, asm_stats,  layout_matrix = rbind(c(1, 1, 1, 2), c(1, 1, 1, 2)))
+```
+
+# Figure S2
+
+This figure shows quality metrics for final assemblies of *I. senegalensis*. Fig. S2a shows the results of busco analyses. Fig. S2b reports quality metrics and was drawn usinh Inkscape.
+
+```{r AssemblyQCsen, echo=TRUE, warning=FALSE}
+asmq <-
+  read.csv(
+    "~/Dropbox/VR/Writing/Assembly_statistics_sen.csv",
+    header = T,
+    sep = ","
+  )
+asmq$Buscos <-
+  factor(
+    asmq$Buscos,
+    levels = c(
+      "Missing",
+      "Fragmented",
+      "Complete_duplicated",
+      "Complete_single"
+    )
+  )
+
+Buscos <-
+  ggplot(data = asmq, aes(y = Value, x = Assembly, fill = Buscos))  +
+  geom_bar(
+    stat = "identity",
+    alpha = 0.8,
+    color = "white",
+    lwd = 0.2
+  ) +
+  #facet_grid(cols = vars(Assembly)) +
+  labs(x = "Assembly", y = "% Insect BUSCOs (n = 1367)") +
+  theme_light(base_size = 7) +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor  = element_blank()) +
+  theme(plot.title = element_text(face = "bold")) +
+  scale_x_discrete(labels = c("aa", "OO")) +
+  scale_fill_manual(
+    values = viridis(
+      4,
+      begin = 0.1,
+      end = 1,
+      direction = -1
+    ),
+    labels = c(
+      "Missing",
+      "Fragmented",
+      "Complete duplicated",
+      "Complete single"
+    )
+  ) +
+  theme(legend.position = "top") +
+  coord_flip() +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+Buscos
+
+#ggsave(plot = Buscos, filename = "~/Dropbox/VR/Writing/Figures/Isen_buscos.pdf", device = "pdf", dpi = 600, width = 80, height = 60, units = "mm")
+```
+
+# Figure S3
+
+This figure shows how the raw DToL data likely comes from a heterozygous *Ao* individual.
+
+## Fig. S3a: Read-depth coverage
+```{r ToL_read_depth, message=FALSE, echo=TRUE, warning=FALSE}
+# read coverage data
+Tcov <-
+  read.table(
+    "~/Dropbox/VR/ISCH_genome/Afem_1354/coverage/ToL_500_norepeat.regions.bed",
+    header = F
+  )
+colnames(Tcov) <- c("contig", "start", "end", "coverage")
+
+# flip coords to match DToL assembly
+Tcov$midpoint <- 1541068 - (Tcov$end + Tcov$start) / 2
+
+# compute average coverage in representative contig
+S_avg <- mean(Tcov$coverage[Tcov$contig == "28_1"])
+
+# compute standardized coverage
+n = nrow(Tcov)
+for (i in 1:n) {
+  Tcov$relcov[i] <- Tcov$coverage[i] / S_avg
+  
+}
+
+Tc_plot <-
+  ggplot(data = Tcov[Tcov$contig == "1776_1", ], aes(x = midpoint,
+                                                     y = relcov)) +
+  geom_path(size = 0.5, colour = "black") +
+  ylim (0, 2) +
+  theme_minimal(base_size = 9) +
+  labs(y = "Read depth relative to background", x =  "Window midpoint on unlocalized scaffold 2 (Chr 13)") +
+  theme(panel.grid = element_blank()) +
+  scale_colour_manual(values = pal) +
+  scale_fill_manual(values = pal) +
+  geom_hline(
+    yintercept = 0.5,
+    lty = 3 ,
+    colour = c("gray75") ,
+    size = 0.5
+  ) +
+  geom_hline(
+    yintercept = 1,
+    lty = 2 ,
+    colour = c("gray75") ,
+    size = 0.5
+  )
+
+Tc_plot
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/read_depth_ToL.pdf", plot = Tc_plot, width = 160, height = 60, units = "mm")
+```
+
+## Fig. S3b: Assembly alignments
+
+A vs primary assembly (SUPER_13_unloc_2)
+
+```{r ToL_aln_primary, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <-
+  c(
+    'Start_2',
+    'End_2',
+    'Start_1',
+    'End_1',
+    'L1',
+    'L2',
+    'Percent',
+    'lenR',
+    'lenQ',
+    'Species_2',
+    'Species_1'
+  )
+AT <-
+  read_csv(file = "~/Dropbox/VR/SV/nucmer_aln_Afem_ragtag_ToL-primary.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames)
+
+# filter columns
+AT <- AT[, -c(6:9)]
+AT <-
+  AT[, c('Species_1',
+         'Start_1',
+         'End_1',
+         'Species_2',
+         'Start_2',
+         'End_2',
+         'L1')]
+
+AT <- AT %>% filter(Species_1 == "SUPER_13_unloc_2_RagTag")
+AT <- AT %>% filter(Species_2 == "SUPER_13_unloc_2")
+
+AT <- AT %>% filter(L1 > 5000)
+
+# add colour
+AT$fill <- "CCCCCC"
+
+# write file
+#write.csv(AT, "~/Dropbox/VR/SV/synteny_AToL_unloc2.csv", row.names = F, quote = F)
+syn <-
+  read.csv("~/Dropbox/VR/SV/synteny_AToL_unloc2.csv",
+           header = T,
+           sep = ",")[, -7]
+
+# make chromosome numbers numeric
+syn$Species_1 <-
+  as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_1))
+syn$Species_2 <-
+  as.numeric(gsub("SUPER_13_unloc_2", 1, syn$Species_2))
+
+# highlight shared internal region in black
+for (i in 1:nrow(syn)) {
+  for (k in 1:5) {
+    if (syn$Start_1[i] > 600000 & syn$Start_1[i] < 1000000) {
+      syn$fill[i] <- "000000"
+    }
+  }
+}
+
+# reorder by colour
+syn <- syn[rev(order(syn$fill)), ]
+
+# read karyotype info
+kar <-
+  read.csv(
+    "~/Dropbox/VR/SV/karyotype_AToL_13_unloc_RagTag.csv",
+    header = T,
+    sep = ","
+  )
+
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Writing/Figures/AToL_primary.svg")
+```
+
+A vs haplotigs (RAPID_106)
+ 
+```{r ToL_aln_haplotigs, message=FALSE, echo=TRUE, warning=FALSE}
+# read alignment data
+nucmer_coord_colnames <-
+  c(
+    'Start_2',
+    'End_2',
+    'Start_1',
+    'End_1',
+    'L1',
+    'L2',
+    'Percent',
+    'lenR',
+    'lenQ',
+    'Species_2',
+    'Species_1'
+  )
+AT <-
+  read_csv(file = "~/Dropbox/VR/SV/nucmer_aln_Afem_ragtag_ToL-haplotigs.qr1_filter.reformat.coords", col_names = nucmer_coord_colnames)
+
+# filter columns
+AT <- AT[,-c(6:9)]
+AT <-
+  AT[, c('Species_1',
+         'Start_1',
+         'End_1',
+         'Species_2',
+         'Start_2',
+         'End_2',
+         'L1')]
+
+AT <- AT %>% filter(Species_1 == "SUPER_13_unloc_2_RagTag")
+AT <- AT %>% filter(Species_2 == "RAPID_106")
+
+AT <- AT %>% filter(L1 > 5000)
+
+# add colour
+AT$fill <- "CCCCCC"
+
+# write file
+write.csv(
+  AT,
+  "~/Dropbox/VR/SV/synteny_AToL_haplotigs_unloc2.csv",
+  row.names = F,
+  quote = F
+)
+syn <-
+  read.csv(
+    "~/Dropbox/VR/SV/synteny_AToL_haplotigs_unloc2.csv",
+    header = T,
+    sep = ","
+  )[,-7]
+
+# make chromosome numbers numeric
+syn$Species_1 <-
+  as.numeric(gsub("SUPER_13_unloc_2_RagTag", 1, syn$Species_1))
+syn$Species_2 <- as.numeric(gsub("RAPID_106", 1, syn$Species_2))
+
+# flip coords
+syn$Start_2 <- 1682944 - syn$Start_2
+syn$End_2 <- 1682944 - syn$End_2
+
+# read karyotype info
+kar <-
+  read.csv(
+    "~/Dropbox/VR/SV/karyotype_AToL_RagTag_haplotigs.csv",
+    header = T,
+    sep = ","
+  )
+
+#ideogram(karyotype = kar, synteny = syn, output = "~/Dropbox/VR/Writing/Figures/AToL_haplotigs.svg")
+```
+
+# Figure S4
+
+This figure shows a PCA analysis of sample variants at the morph locus, based in the *A* and *I* assemblies.
+
+## Fig. S4a: using *A* as reference
+
+```{r pca_A, message=FALSE, echo=TRUE, warning=FALSE}
+# read in data
+pca <-
+  read_table2("~/Dropbox/VR/popgen/pca/A1354_all.eigenvec", col_names = FALSE)
+eigenval <- scan("~/Dropbox/VR/popgen/pca/A1354_all.eigenval")
+
+# sort out the pca data
+# remove nuisance column
+pca <- pca[, -1]
+# set names
+names(pca)[1] <- "ind"
+names(pca)[2:ncol(pca)] <- paste0("PC", 1:(ncol(pca) - 1))
+
+# first convert to percentage variance explained
+pve <- data.frame(PC = 1:20, pve = eigenval / sum(eigenval) * 100)
+
+# make explained variance plot
+a <- ggplot(pve, aes(PC, pve)) + geom_bar(stat = "identity")
+a + ylab("Percentage variance explained") + theme_light()
+
+# calculate the cumulative sum of the percentage variance explained
+cumsum(pve$pve)
+
+# read morph data and sort columns
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+pca <- left_join(pca, pop, by = c("ind")) %>% arrange(pop)
+
+# mark suspected outliers
+for (i in 1:nrow(pca)) {
+  if (pca$ind[i] == "UE-2969-58013_S91" |
+      pca$ind[i] == "TE-2564-SwD238_S49") {
+    pca$outlier[i] <- 1
+  } else {
+    pca$outlier[i] <- 0
+  }
+}
+
+# plot pca
+A_pca <-
+  ggplot(pca, aes(PC1, PC2, colour = pop, shape = as.factor(outlier))) + geom_point(size = 3, alpha = .5) +
+  scale_colour_manual(values = pal[c(1, 3, 5)], name = "Morph") +
+  scale_shape_manual(values = c("circle", "square"), name = "Outlier") +
+  theme_light(base_size = 9) +
+  # coord_fixed(ratio=1) +
+  xlab(paste0("PC1 (", signif(pve$pve[1], 3), "%)")) + ylab(paste0("PC2 (", signif(pve$pve[2], 3), "%)"))
+
+A_pca
+```
+
+## Fig S4b: using *I* as reference
+```{r pca_I, message=FALSE, echo=TRUE, warning=FALSE}
+# read in data
+pca <-
+  read_table2("~/Dropbox/VR/popgen/pca/I1049_all.eigenvec", col_names = FALSE)
+eigenval <- scan("~/Dropbox/VR/popgen/pca/I1049_all.eigenval")
+
+# sort out the pca data
+# remove nuisance column
+pca <- pca[,-1]
+# set names
+names(pca)[1] <- "ind"
+names(pca)[2:ncol(pca)] <- paste0("PC", 1:(ncol(pca) - 1))
+
+# first convert to percentage variance explained
+pve <- data.frame(PC = 1:20, pve = eigenval / sum(eigenval) * 100)
+
+# make explained variance plot
+a <- ggplot(pve, aes(PC, pve)) + geom_bar(stat = "identity")
+a + ylab("Percentage variance explained") + theme_light()
+
+# calculate the cumulative sum of the percentage variance explained
+cumsum(pve$pve)
+
+# read morph data and sort columns
+pop <- read.table("~/Dropbox/VR/GWAS/SwD_popmap", header = T)
+pca <- left_join(pca, pop, by = c("ind")) %>% arrange(pop)
+
+# mark suspected outliers
+for (i in 1:nrow(pca)) {
+  if (pca$ind[i] == "UE-2969-58013_S91" |
+      pca$ind[i] == "TE-2564-SwD238_S49") {
+    pca$outlier[i] <- 1
+  } else {
+    pca$outlier[i] <- 0
+  }
+}
+
+# plot pca
+I_pca <-
+  ggplot(pca, aes(PC1, PC2, colour = pop, shape = as.factor(outlier))) + geom_point(size = 3, alpha = .5) +
+  scale_colour_manual(values = pal[c(1, 3, 5)], name = "Morph") +
+  scale_shape_manual(values = c("circle", "square"), name = "Outlier") +
+  #coord_fixed(ratio = 1) +
+  theme_light(base_size = 9) +
+  xlab(paste0("PC1 (", signif(pve$pve[1], 3), "%)")) + ylab(paste0("PC2 (", signif(pve$pve[2], 3), "%)"))
+
+I_pca
+
+Pca_both <- grid.arrange(A_pca, I_pca, ncol = 1)
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Sample_pca.pdf", plot = Pca_both, device = "pdf", width = 160, height = 160, units = "mm")
+```
+
+# Figure S5
+
+This figure provides additional evidence of a SV shared by *A* and *I* females, compared to *O*, using the *I* assembly as mapping reference. The figure was generated using [Samplot](https://github.com/ryanlayer/samplot) with minor aesthetic edits in Inkscape.
+
+# Figure S6
+
+This figure provides evidence of a SV shared by *O* and *I* females, compared to *A*, using the *A* assembly as mapping reference. The figure was generated using [Samplot](https://github.com/ryanlayer/samplot) with minor aesthetic edits in Inkscape.
+
+# Figure S7
+
+This figure shows TE coverage separately for each of the main TE families
+
+```{r TE_family, message=FALSE, echo=TRUE, warning=FALSE}
+# group TE data by family
+reps_fam <- rep_dat %>%
+  group_by(Window, Query, Family) %>%
+  summarise(length = sum(Length), n = n())
+
+# make column with genomic region
+for (i in 1:nrow(reps_fam)) {
+  if (grepl(pattern = "SUPER_13", x = reps_fam$Query[i])) {
+    reps_fam$region[i] <- reps_fam$Query[i]
+  }
+  else {
+    reps_fam$region[i] <- "main"
+  }
+}
+
+# select the main families
+reps_fam_sub <- reps_fam %>%
+  filter(
+    Family == "DNA/Maverick" |
+      Family == "DNA/PiggyBac" | Family == "DNA/Sola-2" |
+      Family == "DNA/TcMar-Mariner" |
+      Family == "DNA/TcMar-Pogo" |
+      Family == "DNA/TcMar-Tigger" |
+      Family == "LINE/CR1" |
+      Family == "LINE/Dong-R4" |
+      Family == "LINE/I" |
+      Family == "LINE/I-Jockey" |
+      Family == "LINE/R1" |
+      Family == "LINE/L2" |
+      Family == "LINE/RTE-BovB" |
+      Family == "LTR/Copia" | Family == "LTR/Gypsy"
+  )
+
+# plot
+pal <- wes_palette("Zissou1")
+
+reps_fam_p <-
+  ggplot(data = reps_fam_sub,
+         aes(
+           x = region,
+           y = length / w_size,
+           colour = region,
+           size = region
+         )) +
+  geom_jitter(width = 0.2, size = 0.2) +
+  facet_wrap( ~ Family, ncol = 3) +
+  theme_minimal(base_size = 6) +
+  theme(legend.position = "none",
+        #panel.grid.major.x = element_blank(),
+        #panel.grid.minor.x = element_blank(),
+        #panel.grid.major.y = element_blank(),
+        #panel.grid.minor.y = element_blank(),
+        axis.text.x = element_text(angle = 45)) +
+  scale_colour_manual(
+    values = c("grey", pal),
+    labels = c(
+      "genome wide",
+      "Chr 13",
+      "Chr 13_1",
+      "Chr 13_2",
+      "Chr 13_3",
+      "Chr 13_4"
+    ),
+    name = "Region"
+  ) +
+  labs(y = "TE coverage", x = "Region") +
+  scale_x_discrete(labels = c(
+    "genome wide",
+    "Chr 13",
+    "Chr 13_1",
+    "Chr 13_2",
+    "Chr 13_3",
+    "Chr 13_4"
+  )) +
+  scale_size_manual(values = c(0.5, rep(1.5, 5)))
+
+reps_fam_p
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/TE_fam.pdf", plot = reps_fam_p, width = 160, height = 180, units = "mm")
+```
+
+# Figure S8
+
+This figure provides additional support for the shared genetic basis of *A* in *I. elegans* and *I. senegalensis*.
+
+```{r prep_cov_diff, message=FALSE, echo=TRUE, warning=FALSE}
+# Read data
+s_all_cov <-
+  read.table("~/Dropbox/VR/I_sen/morph_coverage_norepeat_diff_500.tsv",
+             header = F)
+colnames(s_all_cov) <- c("contig", "start", "end", "A", "O", "diff")
+
+# Region outside the AvO locus
+s_all_cov_bg <- s_all_cov[which(s_all_cov$contig != "1776_1"), ]
+s_all_cov_bg$cand <- 0
+
+# Avo locus
+s_all_cov_cd <- s_all_cov[which(s_all_cov$contig == "1776_1"), ]
+s_all_cov_cd$cand <- 1
+
+# Make data frame
+s_all_cov <- rbind(s_all_cov_cd, s_all_cov_bg)
+```
+
+Plot
+```{r cov_diff_den, message=FALSE, echo=TRUE, warning=FALSE}
+denP <-
+  ggplot(data = s_all_cov, aes (x = diff, fill = as.factor(cand))) +
+  geom_histogram(
+    bins = 100,
+    alpha = 0.7,
+    aes(y = ..ndensity..),
+    position = "identity"
+  ) +
+  xlim(-20, 20) +
+  #ylim(0,1.1) +
+  scale_fill_manual(
+    values = c("grey80", wes_palette("Zissou1")[1]),
+    name = "Region",
+    labels = c("background", "AvO locus")
+  ) +
+  labs(x = "A pool read depth - O-like pool read depth", y = "Density (scaled to maximum of 1)") +
+  theme_minimal(base_size = 9) +
+  theme(panel.grid = element_blank())
+
+denP
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Isen_depth_diff.pdf", plot = denP, width = 160, height = 80, units = "mm")
+```
+
+# Figure S9
+
+This figure shows expression patterns of genes in the morph locus in sexually mature and immature individuals of *I. elegans*.
+
+Read and prepare data
+```{r prep_Iele_all, message=FALSE, echo=TRUE, warning=FALSE}
+# sample data
+pheno_data <- read.csv("~/Dropbox/VR/DGE/Iele_phenodata.csv")
+
+# expression data
+y <-
+  read.table(
+    "~/Dropbox/VR/DGE/Afem_counts/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, -1]
+rownames(y) <-
+  read.table(
+    "~/Dropbox/VR/DGE/Afem_counts/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, 1]
+
+# create DGElist-object for edgeR
+x <- DGEList(y)
+
+# normalise gene expression distributions
+x <- calcNormFactors(x, method = "TMM")
+
+# compute expression as log count per million
+lcpm <- cpm(x, log = TRUE)
+```
+
+Plot
+```{r plot_Iele_exp_all, message=FALSE, echo=TRUE, warning=FALSE}
+# select genes
+genes <-
+  c(
+    "Afem.4093.5",
+    "Afem.4094.7",
+    "Afem.4094.17",
+    "Afem.4099.1",
+    "Afem.4100.1",
+    "Afem.4103.1",
+    "Afem.4111.1",
+    "Afem.4111.2",
+    "Afem.4119.1"
+  )
+
+# filter data
+Expdf <- as.data.frame(lcpm[rownames(lcpm) %in% genes, ])
+
+# column with transcript names
+Expdf$Transcript <- rownames(Expdf)
+rownames(Expdf) <- c()
+
+# reshape
+Expdf <-
+  pivot_longer(Expdf,
+               cols = c(1:24),
+               values_to = "Expression",
+               names_to = "ID")
+
+# fix IDs
+pheno_data$ID <- gsub("-", ".", pheno_data$ID)
+Expdf <- left_join(Expdf, pheno_data)
+
+# reorder factor levels
+Expdf$Group2 <-
+  factor(Expdf$Group2,
+         levels = c("A", "I", "O", "M"),
+         ordered = T)
+
+# plot
+pal <- wes_palette("Zissou1")
+p <- ggplot(data = Expdf, aes(Age, Expression)) +
+  geom_point(
+    aes(colour = Group2),
+    size = 1.5 ,
+    show.legend = T,
+    position = position_dodge(width = .5),
+    alpha = .7
+  ) +
+  theme_bw(base_size = 11) +
+  facet_wrap( ~ Transcript, nrow = 2, scales = "free_y") +
+  theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0),
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(
+    values = c(pal[c(1, 3, 5)], "black"),
+    breaks = c("A", "I", "O", "M"),
+    labels = c("A", "I", "O", "Male"),
+    name = "Morph and sex"
+  ) +
+  scale_x_discrete(labels = c ("Immature", "Mature")) +
+  labs (x = "Age", y = "Expression (normalized log counts per million)")
+p
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Candidate_trans_Iele.pdf", plot = p, device = "pdf", width = 200, height = 90, units = "mm")
+```
+
+# Figure S10
+
+This figure shows expression patterns of genes in the morph locus in teneral adults and 2-day adults of *I. senegalensis*.
+
+Read and prepare data
+```{r prep_Isen_all, message=FALSE, echo=TRUE, warning=FALSE}
+# sample data
+pheno_data_sen <- read.csv("~/Dropbox/VR/DGE/Isen_phenodata.csv")
+
+# transcript data
+z <-
+  read.table(
+    "~/Dropbox/VR/DGE/Afem_counts_Isen/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, -1]
+
+# add transcript names as row names
+rownames(z) <-
+  read.table(
+    "~/Dropbox/VR/DGE/Afem_counts_Isen/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, 1]
+
+# convert to DGE-list object
+w <- DGEList(z)
+
+# normalize across samples
+w <- calcNormFactors(w, method = "TMM")
+
+# compute expression as log counts per million
+lcpm_sen <- cpm(w, log = TRUE)
+```
+
+Plot
+```{r plot_Isen_exp_all, message=FALSE, echo=TRUE, warning=FALSE}
+# select genes
+genes <-
+  c(
+    "Afem.4093.5",
+    "Afem.4094.7",
+    "Afem.4094.17",
+    "Afem.4099.1",
+    "Afem.4100.1",
+    "Afem.4103.1",
+    "Afem.4111.1",
+    "Afem.4111.2",
+    "Isen.3751.2"
+  )
+
+# filter genes
+Expdf_sen <- as.data.frame(lcpm_sen[rownames(lcpm_sen) %in% genes, ])
+
+# column with transcript names
+Expdf_sen$Transcript <- rownames(Expdf_sen)
+rownames(Expdf_sen) <- c()
+
+# reshape
+Expdf_sen <-
+  pivot_longer(
+    Expdf_sen,
+    cols = c(1:24),
+    values_to = "Expression",
+    names_to = "ID"
+  )
+Expdf_sen <- left_join(Expdf_sen, pheno_data_sen)
+
+# reorder factor levels
+Expdf_sen$Group2 <-
+  factor(Expdf_sen$Group2,
+         levels = c("A", "O", "M"),
+         ordered = T)
+
+# plot data from tenerals
+pal <- wes_palette("Zissou1")
+p_sen_ten <-
+  ggplot(data = Expdf_sen[Expdf_sen$Age == "immature", ], aes(Tissue, Expression)) +
+  geom_point(
+    aes(colour = Group2),
+    size = 1.5 ,
+    show.legend = T,
+    position = position_dodge(width = .5),
+    alpha = 0.7
+  ) +
+  theme_bw(base_size = 11) +
+  facet_wrap( ~ Transcript, nrow = 2, scales = "free_y") +
+  theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0),
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(
+    values = c(pal[c(1, 5)], "black"),
+    breaks = c("A", "O", "M"),
+    labels = c("A",  "O", "Male"),
+    name = "Morph and sex"
+  ) +
+  #scale_shape_manual(values = c("circle", "square"), name = "Age") +
+  #scale_x_discrete(breaks = c( "immature", "mature"),
+  #                 labels = c ( "Immature", "Mature")) +
+  labs (x = "Tissue", y = "Expression (normalized log counts per million)")
+#p_sen_ten
+
+# plot data from 2-day adults
+p_sen_imm <-
+  ggplot(data = Expdf_sen[Expdf_sen$Age == "mature", ], aes(Tissue, Expression)) +
+  geom_point(
+    aes(colour = Group2),
+    size = 1.5 ,
+    shape = "square",
+    show.legend = T,
+    position = position_dodge(width = .5),
+    alpha = 0.7
+  ) +
+  theme_bw(base_size = 11) +
+  facet_wrap( ~ Transcript, nrow = 2, scales = "free_y") +
+  theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0),
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(
+    values = c(pal[c(1, 5)], "black"),
+    breaks = c("A", "O", "M"),
+    labels = c("A",  "O", "Male"),
+    name = "Morph and sex"
+  ) +
+  #scale_x_discrete(breaks = c( "immature", "mature"),
+  #                 labels = c ( "Immature", "Mature")) +
+  labs (x = "Tissue", y = "Expression (normalized log counts per million)")
+
+p_sen <- grid.arrange(p_sen_ten, p_sen_imm, ncol = 1)
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Candidate_trans_Isen.pdf", plot = p_sen, device = "pdf", width = 200, height = 180, units = "mm")
+```
+
+# Figure S11
+
+This figure shows expression patterns for the paralog zinc finger genes flanking the morph locus in *A* and *I* individuals.
+
+```{r prep_Iele_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# Read in data
+pheno_data <- read.csv("~/Dropbox/VR/DGE/Iele_phenodata.csv")
+y <-
+  read.table(
+    "~/Dropbox/VR/DGE/DToL_counts/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, -1]
+
+# Add transcript names as row names
+rownames(y) <-
+  read.table(
+    "~/Dropbox/VR/DGE/DToL_counts/transcript_count_matrix.csv",
+    header = T,
+    sep = ","
+  )[, 1]
+
+# Convert to DGE-list object
+x <- DGEList(y)
+
+# Normalize across samples
+x <- calcNormFactors(x, method = "TMM")
+lcpm <- cpm(x, log = TRUE)
+```
+
+Plot two interesting transcripts
+```{r plot_Iele_exp_ToL, message=FALSE, echo=TRUE, warning=FALSE}
+# Match names
+pheno_data$ID <- gsub("-", ".", pheno_data$ID)
+
+# Select genes
+genes <- c("MSTRG.3400.1", "MSTRG.3388.1")
+Expdf <-
+  as.data.frame(lcpm[rownames(lcpm) %in% genes, colnames(lcpm) %in% pheno_data$ID])
+
+# Transcript names to column
+Expdf$Transcript <- rownames(Expdf)
+rownames(Expdf) <- c()
+
+# Reshape
+Expdf <-
+  pivot_longer(Expdf,
+               cols = c(1:24),
+               values_to = "Expression",
+               names_to = "ID")
+
+# Add sample data
+Expdf <- left_join(Expdf, pheno_data)
+
+# Reorder factor levels
+Expdf$Group2 <-
+  factor(Expdf$Group2,
+         levels = c("A", "I", "O", "M"),
+         ordered = T)
+
+Expdf$Transcript <-
+  factor(
+    Expdf$Transcript,
+    levels = c("MSTRG.3388.1", "MSTRG.3400.1"),
+    labels = c("LOC124172704", "LOC124172753")
+  )
+
+# Plot
+pal <- wes_palette("Zissou1")
+p <- ggplot(data = Expdf, aes(Age, Expression)) +
+  geom_point(
+    aes(colour = Group2),
+    size = 1.5 ,
+    show.legend = T,
+    position = position_dodge(width = .5),
+    alpha = .7
+  ) +
+  theme_minimal(base_size = 11) +
+  facet_wrap( ~ Transcript, nrow = 1, scales = "free_y") +
+  theme_classic(base_size = 8) +
+  #theme(axis.text.x = element_text(angle = 0),
+  #      panel.grid = element_blank(),
+  #      legend.position = "none") +
+  scale_color_manual(
+    values = c(pal[c(1, 3, 5)], "black"),
+    breaks = c("A", "I", "O", "M"),
+    labels = c("A", "I", "O", "Male"),
+    name = "Morph and sex"
+  ) +
+  scale_x_discrete(labels = c ("Immature", "Mature")) +
+  labs (x = "Age", y = "I. elegans expression (lcpm)")
+p
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Expression_ToL_Unchar.pdf", plot = p, device = "pdf", width = 160, height = 60, units = "mm")
+```
+
+# Figure S12
+
+This figure shows the genotypes in 57 samples for the gene Afem.4111 (LOC124172682) and a gene tree of orthologues across insects.
+
+## Fig. S12a: Genotype plot
+
+First annotate the domains
+```{r GZnf_domains, message=FALSE, echo=TRUE, warning=FALSE}
+# read domain ranges
+dd <-
+  read.csv("~/Dropbox/VR/ISCH_genome/Candidate_annotation/GZnf_domain_annot.csv",
+           header = T)
+
+# plot
+domains <-
+  ggplot(data = dd, aes(x = start, colour = domain, fill = domain)) + geom_rect(aes(
+    xmin = start,
+    xmax = end,
+    ymin = rep(0, 5),
+    ymax = rep(1, 5)
+  ), alpha = 0.7) +
+  scale_color_manual(values = c("#006699", "#9ccccc"), na.value = "white") +
+  scale_fill_manual(values = c("#006699", "#9ccccc"), na.value = "white") +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.line = element_blank(),
+    legend.position = "none"
+  ) +
+  geom_text(
+    x = 65,
+    y = 0.5,
+    label = "Znf_AD",
+    colour = "white",
+    size = 3
+  ) +
+  geom_text(
+    x = 1139,
+    y = 0.5,
+    label = "Znf_C2H2",
+    colour = "white",
+    size = 3
+  )
+
+domains
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Afem4111_domains.pdf", plot = domains, width = 180, height = 20, units = "mm")
+```
+
+```{r read_vcf, message=FALSE, echo=TRUE, warning=FALSE}
+pal <- wes_palette("Zissou1")
+# read popmap
+my_popmap <-
+  read.table("~/Dropbox/VR/ISCH_genome/Candidate_annotation/vcf_popmap",
+             header = T)
+```
+
+Afem.4111 shown in the figure
+```{r genplot_4111, message=FALSE, echo=TRUE, warning=FALSE, results='hide'}
+# make the genotype plot
+Afem.4111.g <-
+  genotype_plot(
+    vcf = "~/Dropbox/VR/ISCH_genome/Candidate_annotation/A1354-ragtag-allsites-candidate_gene_cds.vcf.gz",
+    chr = "SUPER_13_unloc_2_RagTag",
+    start  = 805539,
+    end  = 887759,
+    popmap = my_popmap,
+    cluster = FALSE,
+    snp_label_size = 10000,
+    colour_scheme = c("grey95", pal[2], pal[1], "white", "white"),
+    polarise_genotypes = "O",
+    invariant_filter = FALSE
+  )
+
+Afem.4111.g$genotypes
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Afem4111_variants.pdf", plot = new_plot$genotypes, width = 180, height = 60, units = "mm")
+```
+
+Afem.4093 no fixed SNPs between morphs (not shown)
+```{r genplot_4093, message = FALSE, echo = TRUE, warning = FALSE, results ='hide'}
+Afem.4093.g <-
+genotype_plot(
+vcf = "~/Dropbox/VR/ISCH_genome/Candidate_annotation/A1354-ragtag-allsites-candidate_gene_cds.vcf.gz",
+chr = "SUPER_13_unloc_2_RagTag",
+start  = 18806,
+end  = 53029,
+popmap = my_popmap,
+cluster = FALSE,
+snp_label_size = 10000,
+colour_scheme = c("grey95", pal[2], pal[1], "grey", "white"),
+invariant_filter = FALSE
+)
+
+Afem.4093.g$genotypes
+```
+
+Afem.4119 no fixed SNPs between morphs (not shown)
+```{r genplot_4119, message=FALSE, echo=TRUE, warning=FALSE, results='hide'}
+Afem.4119.g <-
+  genotype_plot(
+    vcf = "~/Dropbox/VR/ISCH_genome/Candidate_annotation/A1354-ragtag-allsites-candidate_gene_cds.vcf.gz",
+    chr = "SUPER_13_unloc_2_RagTag",
+    start  = 1569323,
+    end  = 1597099,
+    popmap = my_popmap,
+    cluster = FALSE,
+    snp_label_size = 10000,
+    colour_scheme = c("grey95", pal[2], pal[1], "grey", "white"),
+    polarise_genotypes = "O",
+    invariant_filter = FALSE
+  )
+
+Afem.4119.g$genotypes
+```
+
+## Fig. S12b: Gene tree
+
+```{r ortho_tree, message=FALSE, echo=TRUE, warning=FALSE}
+# read Orthofinder output
+Gtre <-read.tree("~/Dropbox/VR/ISCH_genome/Candidate_annotation/GZnF_orthologue.tre")
+
+# fix taxon names
+Gtre$tip.label <- gsub("|A0A6J1N1R8_BICAN", "", Gtre$tip.label, fixed = T)
+Gtre$tip.label <- gsub("tr|", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("LFUL_", "Ladona_fulva_", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("-PA", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|A0A067QY43_ZOONE", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|D6WLY9_TRICA", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|X1XM45_ACYPI", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|J9L9B7_ACYPI", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|A0A6J1SJW7_FRAOC", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|X1WLV0_ACYPI", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|A0A6J1SYK7_FRAOC", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|E1JJI1_DROME", "", Gtre$tip.label,  fixed = T)
+Gtre$tip.label <- gsub("|Q9VHR4_DROME", "", Gtre$tip.label,  fixed = T)
+
+# identify node ancestral to both isoforms
+anc <- getMRCA(Gtre, c("Ischnura_elegans_XP_046408097.1", "Ischnura_elegans_XP_046408098.1"))
+
+# read chromosome/taxon annotations
+od <- read.table("~/Dropbox/VR/ISCH_genome/Candidate_annotation/GZnf_orthologue_annot.txt", header = T, sep = ",")[,c(3)]
+od <- as.data.frame(od)
+colnames(od) <- "Chr"
+
+# simplify factor levels
+for (i in 1:nrow(od)) {
+  if (od$Chr[i] == "1" |
+      od$Chr[i] == "3" |
+      od$Chr[i] == "5" |
+      od$Chr[i] == "7" |
+      od$Chr[i] == "8" |
+      od$Chr[i] == "9" | od$Chr[i] == "10" | od$Chr[i] == "12") {
+    od$Chr_simple[i] <- "main"
+  } else
+  {
+    if (od$Chr[i] == "13" |
+        od$Chr[i] == "13_2" | od$Chr[i] == "13_3") {
+      od$Chr_simple[i] <- "13"
+    }
+    else{
+      od$Chr_simple[i] <- od$Chr[i]
+    }
+  }
+}
+
+od$Chr_simple <- factor(od$Chr_simple, levels = c("main", "13", "X", "Odonata", "Hemimetabolous", "Holometabolous"), ordered = T )
+od <- as.data.frame(od[,2])
+row.names(od) <- Gtre$tip.label
+
+#plot
+pal <- wes_palette("Zissou1",type = "discrete")
+
+# base tree
+p <- ggtree(Gtre, layout = "rectangular") + geom_tiplab(size = 0, align = T, offset = 0.05) +
+    geom_hilight(node=anc, fill="#9ccccc")
+
+# add annotations
+p2 <-
+  p %>% gheatmap(
+    od,
+    offset = 0.1,
+    width = 0.1,
+    font.size = 7,
+    colnames_angle = 0,
+    hjust = 0,
+    colnames = F
+  ) +
+  scale_fill_manual(
+    breaks =  c(
+      "main",
+      "13",
+      "X",
+      "Odonata",
+      "Hemimetabolous",
+      "Holometabolous"
+    ),
+    values = c("#006699", "#9ccccc",  pal[3], "grey85", "grey50", "grey15"),
+    labels = c(
+      "1-12",
+      "13",
+      "X",
+      "Odonata",
+      "Hemimetabolous",
+      "Holometabolous"
+    ),
+    na.value = "white",
+    name = "chromosome"
+  )
+
+p2
+
+#ggsave(filename = "~/Dropbox/VR/Writing/Figures/Afem4111_phylo.pdf", plot = p2, width = 80, height = 160, units = "mm")
+```
